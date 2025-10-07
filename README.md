@@ -39,6 +39,36 @@ pip install -e .
 pip install -e ".[dev]"
 ```
 
+## Getting Activity Logs from Math Academy
+
+### How to Download PDF Activity Logs
+
+Before using this tool, you need to download the activity log PDF from Math Academy:
+
+1. **Log in to Parent/Supervising Account**
+   - Go to [mathacademy.com](https://mathacademy.com)
+   - Sign in with your parent or supervising account credentials
+
+2. **Navigate to Student Settings**
+   - Click on the student's settings icon (⚙️) next to their name
+   - Select **"Documentation"** from the menu
+
+3. **Request Activity Log**
+   - Under **"Activity Log"** section, click **"Request..."**
+   - Set your desired **Time Frame** (e.g., Last 30 days, Last 3 months, Custom range)
+   - Click **"Preview"** to generate the activity log
+
+4. **Download PDF**
+   - Wait for the preview to load
+   - Download the PDF file using your browser's download option
+   - Save it with a descriptive name (e.g., `student_activity_log_2025-01.pdf`)
+
+### Tips for Best Results
+- **Time Frame**: Choose a reasonable time range (1-6 months) for optimal processing
+- **File Naming**: Use descriptive names to easily identify different reports
+- **Regular Downloads**: Download reports monthly for consistent tracking
+- **Browser**: Use Chrome or Firefox for best compatibility
+
 ## Usage
 
 ### Basic Commands

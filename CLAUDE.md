@@ -10,9 +10,40 @@ This is a Python project for parsing course progress data from PDF activity logs
 
 - Directory: `/Users/xiaobin/project/ma_new`
 - Status: Active Python project with PDF parsing CLI tools
-- Package: `ma_log_pdf_parser` version 0.1.0
+- Package: `MathAcademyLogAnalyzer` version 0.1.0 (CLI: `mathacademy-analyzer`)
 - Virtual environment: `venv/` (Python 3.9+)
 - Key dependency: pdfplumber>=0.9.0 for PDF processing
+- Documentation: Bilingual (English/Chinese) README files
+
+## Data Source: Math Academy Activity Logs
+
+### How to Get PDF Activity Logs from Math Academy
+
+**Important**: This tool analyzes Math Academy activity logs that must be downloaded from the Math Academy platform:
+
+1. **Log in to Parent/Supervising Account**
+   - Go to [mathacademy.com](https://mathacademy.com)
+   - Sign in with parent/supervising account credentials
+
+2. **Access Student Documentation**
+   - Click the student's settings icon (⚙️) next to their name
+   - Select "Documentation" from the menu
+
+3. **Generate Activity Log**
+   - Under "Activity Log" section, click "Request..."
+   - Set Time Frame (recommended: 1-6 months)
+   - Click "Preview" to generate the log
+
+4. **Download PDF**
+   - Wait for preview to load
+   - Download PDF from browser
+   - Save with descriptive filename (e.g., `student_activity_2025-01.pdf`)
+
+### Data Privacy and Security
+- **Parent accounts only**: Activity logs require parent/supervising account access
+- **Local processing**: All analysis happens locally - no data sent to external servers
+- **PDF processing**: Only the downloaded PDF files are processed
+- **File handling**: Processed data can be exported to Excel/JSON for local use
 
 ## Development Commands
 
@@ -58,28 +89,34 @@ pytest tests/test_main.py::test_hello
 ### Running the Application
 ```bash
 # Show CLI help
-ma_log_pdf_parser --help
+mathacademy-analyzer --help
 
 # Get PDF information
-ma_log_pdf_parser info document.pdf
+mathacademy-analyzer info document.pdf
 
 # Extract text from PDF
-ma_log_pdf_parser text document.pdf
+mathacademy-analyzer text document.pdf
 
 # Extract text by page to file
-ma_log_pdf_parser text document.pdf --pages --output text_by_page.json
+mathacademy-analyzer text document.pdf --pages --output text_by_page.json
 
 # Extract tables from PDF
-ma_log_pdf_parser tables document.pdf
+mathacademy-analyzer tables document.pdf
 
 # Search for text in PDF
-ma_log_pdf_parser search document.pdf "search term"
+mathacademy-analyzer search document.pdf "search term"
 
 # Extract text with position data
-ma_log_pdf_parser positions document.pdf --output positions.json
+mathacademy-analyzer positions document.pdf --output positions.json
 
 # Export course data to Excel
-ma_log_pdf_parser export document.pdf output.xlsx
+mathacademy-analyzer export document.pdf output.xlsx
+
+# Generate charts from JSON data
+mathacademy-analyzer chart data.json --chart-type dashboard
+
+# Show XP statistics
+mathacademy-analyzer stats data.json
 ```
 
 ## Project Architecture
