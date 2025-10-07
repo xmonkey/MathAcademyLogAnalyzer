@@ -31,7 +31,7 @@ This is a Python project for parsing course progress data from PDF activity logs
 
 3. **Generate Activity Log**
    - Under "Activity Log" section, click "Request..."
-   - Set Time Frame (recommended: 1-6 months)
+   - Set Time Frame (include the learning period you want to analyze, recommended to start from the first day of learning)
    - Click "Preview" to generate the log
 
 4. **Download PDF**
