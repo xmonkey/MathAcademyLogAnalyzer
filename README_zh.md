@@ -1,0 +1,62 @@
+# MathAcademyLogAnalyzer
+
+MathAcademyLogAnalyzer 是一个用于分析 mathacademy.com PDF 活动日志中课程进度数据的 Python 工具。
+
+*灵感来源于 [rng.eth](https://x.com/crackedmonk/status/1962663418089107666)*
+
+[English Documentation](README.md)
+
+## 快速开始
+
+### 1. 安装
+```bash
+# 克隆并安装
+git clone <repository-url>
+cd MathAcademyLogAnalyzer
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -e .
+```
+
+### 2. 下载活动日志 PDF
+1. 使用家长账户登录 [mathacademy.com](https://mathacademy.com)
+2. 点击学生设置图标 (⚙️) → "Documentation"
+3. 在 "Activity Log" 下点击 "Request..."
+4. 设置时间范围（建议：从第一天学习开始）
+5. 点击 "Preview" → 下载 PDF
+
+### 3. 分析并生成图表
+```bash
+# 提取课程数据到 Excel 和 JSON
+mathacademy-analyzer export activity_log.pdf output.xlsx
+
+# 生成交互式HTML图表（默认）
+mathacademy-analyzer chart output.json --output ./charts/
+
+# 生成静态PNG图片
+mathacademy-analyzer chart output.json --static --output ./charts/
+
+# 查看 XP 统计
+mathacademy-analyzer stats output.json
+```
+
+## 输出格式
+- **交互式HTML**（默认）：支持缩放、悬停和提示的交互图表
+- **静态PNG**：适合文档和分享的静态图片文件
+
+## 更多实用命令
+```bash
+# 获取 PDF 信息
+mathacademy-analyzer info activity_log.pdf
+
+# 提取文本或表格
+mathacademy-analyzer text activity_log.pdf
+mathacademy-analyzer tables activity_log.pdf
+
+# 搜索内容
+mathacademy-analyzer search activity_log.pdf "搜索词"
+```
+
+---
+
+*文档由 Claude Code 优化*
