@@ -922,7 +922,7 @@ class ChartGenerator:
     def _generate_interactive_daily_xp_distribution(self, df: pd.DataFrame, stats: dict, output_path: str) -> str:
         """Generate interactive daily XP distribution chart using Plotly."""
         fig = go.Figure()
-        
+
         # Create histogram bars
         fig.add_trace(go.Bar(
             x=df['XP Range'].astype(str),
@@ -931,24 +931,57 @@ class ChartGenerator:
             marker_color='#2E86AB',
             hovertemplate='<b>%{x}</b><br>Days: %{y}<extra></extra>'
         ))
-        
-        # Add reference lines for mean and median
-        fig.add_vline(
-            x=stats['mean_daily_xp'], 
-            line_dash="dash", 
-            line_color="red", 
-            annotation_text=f"Mean: {stats['mean_daily_xp']:.1f}",
-            annotation_position="top"
-        )
-        
-        fig.add_vline(
-            x=stats['median_daily_xp'], 
-            line_dash="dot", 
-            line_color="orange", 
-            annotation_text=f"Median: {stats['median_daily_xp']:.1f}",
-            annotation_position="top"
-        )
-        
+
+        # Create annotations for mean and median instead of vertical lines
+        # This works better with categorical x-axis
+        annotations = []
+
+        # Find which XP range contains the mean
+        mean_range = self._find_xp_range_for_value(stats['mean_daily_xp'], df)
+        if mean_range:
+            mean_idx = df[df['XP Range'] == mean_range].index[0]
+            mean_count = df.loc[mean_idx, 'Day Count']
+            annotations.append(
+                go.layout.Annotation(
+                    x=mean_idx,
+                    y=mean_count * 1.1,
+                    text=f"Mean: {stats['mean_daily_xp']:.1f}",
+                    showarrow=True,
+                    arrowhead=2,
+                    arrowsize=1,
+                    arrowwidth=2,
+                    arrowcolor="red",
+                    ax=0,
+                    ay=-30,
+                    bordercolor="red",
+                    borderwidth=2,
+                    bgcolor="white"
+                )
+            )
+
+        # Find which XP range contains the median
+        median_range = self._find_xp_range_for_value(stats['median_daily_xp'], df)
+        if median_range:
+            median_idx = df[df['XP Range'] == median_range].index[0]
+            median_count = df.loc[median_idx, 'Day Count']
+            annotations.append(
+                go.layout.Annotation(
+                    x=median_idx,
+                    y=median_count * 1.2,
+                    text=f"Median: {stats['median_daily_xp']:.1f}",
+                    showarrow=True,
+                    arrowhead=2,
+                    arrowsize=1,
+                    arrowwidth=2,
+                    arrowcolor="orange",
+                    ax=0,
+                    ay=-30,
+                    bordercolor="orange",
+                    borderwidth=2,
+                    bgcolor="white"
+                )
+            )
+
         # Update layout
         fig.update_layout(
             title=f"Daily XP Distribution - {self.data.get('student_name', 'Student')}<br>"
@@ -958,13 +991,21 @@ class ChartGenerator:
             height=500,
             showlegend=False,
             xaxis_title="Daily XP Range",
-            yaxis_title="Number of Days"
+            yaxis_title="Number of Days",
+            annotations=annotations
         )
-        
+
         # Save as HTML
         output_file = f"{output_path}.html"
         fig.write_html(output_file)
         return output_file
+
+    def _find_xp_range_for_value(self, value: float, df: pd.DataFrame) -> Optional[pd.Interval]:
+        """Find which XP range contains the given value."""
+        for range_val in df['XP Range']:
+            if range_val.left <= value <= range_val.right:
+                return range_val
+        return None
     
     def _generate_static_daily_xp_distribution(self, df: pd.DataFrame, stats: dict, output_path: str) -> str:
         """Generate static daily XP distribution chart using Matplotlib."""
