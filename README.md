@@ -8,13 +8,16 @@ MathAcademyLogAnalyzer is a Python tool for analyzing course progress data from 
 
 ## Quick Start
 
-### 1. Installation
+### 1. Install
 ```bash
 # Clone and install
-git clone <repository-url>
+git clone https://github.com/xmonkey/MathAcademyLogAnalyzer.git
 cd MathAcademyLogAnalyzer
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -e .
+```
+
+**Windows users:**
+```cmd
 pip install -e .
 ```
 
@@ -25,18 +28,13 @@ pip install -e .
 4. Set time frame (recommended: from first day of learning)
 5. Click "Preview" → Download PDF
 
-### 3. Analyze and Generate Charts
+### 3. Analyze
 ```bash
-# Extract course data to Excel and JSON
+# Extract data and generate charts
 mathacademy-analyzer export activity_log.pdf output.xlsx
+mathacademy-analyzer chart output.json
 
-# Generate interactive HTML charts (default)
-mathacademy-analyzer chart output.json --output ./charts/
-
-# Generate static PNG images
-mathacademy-analyzer chart output.json --static --output ./charts/
-
-# View XP statistics
+# View statistics
 mathacademy-analyzer stats output.json
 ```
 
@@ -55,6 +53,36 @@ mathacademy-analyzer tables activity_log.pdf
 
 # Search content
 mathacademy-analyzer search activity_log.pdf "search term"
+```
+
+## Global Installation (Optional)
+
+Install from any directory to use globally:
+
+```bash
+cd MathAcademyLogAnalyzer
+python3 -m pip install -e .
+```
+
+## Upgrade
+
+```bash
+# Get latest code
+git pull
+
+# Reinstall
+pip install -e .
+```
+
+## Troubleshooting
+
+**Command not found?**
+```bash
+# Remove old version first
+pip uninstall ma-log-pdf-parser -y
+
+# Reinstall
+python3 -m pip install -e .
 ```
 
 ---

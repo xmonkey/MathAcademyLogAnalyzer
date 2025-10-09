@@ -4,12 +4,19 @@ from pathlib import Path
 from .pdf_parser import PDFParser
 from .course_parser import CourseProgressParser
 from .chart_generator import ChartGenerator
+from . import __version__
 
 
 @click.group()
 def cli():
     """PDF parsing tools using pdfplumber."""
     pass
+
+
+@cli.command()
+def version():
+    """Show version information."""
+    click.echo(f"mathacademy-analyzer version {__version__}")
 
 
 @cli.command()
@@ -216,7 +223,7 @@ def chart(json_path, output, static, dashboard, chart_type):
     - Task type distribution pie chart
     - Weekly/daily XP statistics
     - Learning efficiency trend chart
-    - Average XP by weekday chart
+    - Average Daily XP by weekday chart
     - Daily XP distribution chart (histogram)
     - Comprehensive dashboard (all charts in one page)
     
@@ -295,7 +302,7 @@ def chart(json_path, output, static, dashboard, chart_type):
                 str(output_dir / "weekday_distribution"),
                 interactive=not static
             )
-            generated_charts.append(f"Average XP by weekday chart: {weekday_path}")
+            generated_charts.append(f"Average Daily XP by weekday chart: {weekday_path}")
         
         if chart_type == 'all' or chart_type == 'daily-dist':
             daily_dist_path = chart_gen.generate_daily_xp_distribution_chart(

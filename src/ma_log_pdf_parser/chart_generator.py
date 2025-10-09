@@ -838,24 +838,24 @@ class ChartGenerator:
     def _generate_interactive_weekday_distribution(self, df: pd.DataFrame, output_path: str) -> str:
         """Generate interactive weekday distribution chart using Plotly."""
         fig = go.Figure()
-        
-        # Average XP by weekday
+
+        # Average Daily XP by weekday
         fig.add_trace(go.Bar(
             x=df['Weekday'],
-            y=df['Average XP'],
-            name='Average XP',
+            y=df['Average Daily XP'],
+            name='Average Daily XP',
             marker_color='#F18F01',
-            hovertemplate='<b>%{x}</b><br>Average XP: %{y:.1f}<extra></extra>'
+            hovertemplate='<b>%{x}</b><br>Average Daily XP: %{y:.1f}<extra></extra>'
         ))
-        
+
         # Update layout
         fig.update_layout(
-            title=f"Average XP by Weekday - {self.data.get('student_name', 'Student')}",
+            title=f"Average Daily XP by Weekday - {self.data.get('student_name', 'Student')}",
             template='plotly_white',
             height=500,
             showlegend=False,
             xaxis_title="Weekday",
-            yaxis_title="Average XP"
+            yaxis_title="Average Daily XP"
         )
         
         # Save as HTML
@@ -866,33 +866,33 @@ class ChartGenerator:
     def _generate_static_weekday_distribution(self, df: pd.DataFrame, output_path: str) -> str:
         """Generate static weekday distribution chart using Matplotlib."""
         fig, ax = plt.subplots(figsize=(12, 6))
-        
-        # Average XP by weekday
-        bars = ax.bar(df['Weekday'], df['Average XP'], color='#F18F01', alpha=0.8)
-        ax.set_title('Average XP by Weekday')
-        ax.set_ylabel('Average XP')
+
+        # Average Daily XP by weekday
+        bars = ax.bar(df['Weekday'], df['Average Daily XP'], color='#F18F01', alpha=0.8)
+        ax.set_title('Average Daily XP by Weekday')
+        ax.set_ylabel('Average Daily XP')
         ax.set_xlabel('Weekday')
         ax.tick_params(axis='x', rotation=45)
         ax.grid(True, alpha=0.3)
-        
+
         # Add value labels on bars
         for bar in bars:
             height = bar.get_height()
             ax.text(bar.get_x() + bar.get_width()/2., height,
                    f'{height:.1f}', ha='center', va='bottom')
-        
+
         # Main title
-        fig.suptitle(f"Average XP by Weekday - {self.data.get('student_name', 'Student')}", 
+        fig.suptitle(f"Average Daily XP by Weekday - {self.data.get('student_name', 'Student')}",
                     fontsize=16, fontweight='bold')
-        
+
         # Adjust layout
         plt.tight_layout()
-        
+
         # Save as PNG
         output_file = f"{output_path}.png"
         plt.savefig(output_file, dpi=300, bbox_inches='tight')
         plt.close()
-        
+
         return output_file
     
     def generate_daily_xp_distribution_chart(self, output_path: Optional[str] = None, 
@@ -925,7 +925,7 @@ class ChartGenerator:
 
         # Create histogram bars
         fig.add_trace(go.Bar(
-            x=df['XP Range'].astype(str),
+            x=df['Range Label'],
             y=df['Day Count'],
             name='Day Count',
             marker_color='#2E86AB',
@@ -937,13 +937,12 @@ class ChartGenerator:
         annotations = []
 
         # Find which XP range contains the mean
-        mean_range = self._find_xp_range_for_value(stats['mean_daily_xp'], df)
-        if mean_range:
-            mean_idx = df[df['XP Range'] == mean_range].index[0]
-            mean_count = df.loc[mean_idx, 'Day Count']
+        mean_range_idx = self._find_xp_range_for_value(stats['mean_daily_xp'], df)
+        if mean_range_idx is not None:
+            mean_count = df.loc[mean_range_idx, 'Day Count']
             annotations.append(
                 go.layout.Annotation(
-                    x=mean_idx,
+                    x=mean_range_idx,
                     y=mean_count * 1.1,
                     text=f"Mean: {stats['mean_daily_xp']:.1f}",
                     showarrow=True,
@@ -960,13 +959,12 @@ class ChartGenerator:
             )
 
         # Find which XP range contains the median
-        median_range = self._find_xp_range_for_value(stats['median_daily_xp'], df)
-        if median_range:
-            median_idx = df[df['XP Range'] == median_range].index[0]
-            median_count = df.loc[median_idx, 'Day Count']
+        median_range_idx = self._find_xp_range_for_value(stats['median_daily_xp'], df)
+        if median_range_idx is not None:
+            median_count = df.loc[median_range_idx, 'Day Count']
             annotations.append(
                 go.layout.Annotation(
-                    x=median_idx,
+                    x=median_range_idx,
                     y=median_count * 1.2,
                     text=f"Median: {stats['median_daily_xp']:.1f}",
                     showarrow=True,
@@ -1000,11 +998,11 @@ class ChartGenerator:
         fig.write_html(output_file)
         return output_file
 
-    def _find_xp_range_for_value(self, value: float, df: pd.DataFrame) -> Optional[pd.Interval]:
-        """Find which XP range contains the given value."""
-        for range_val in df['XP Range']:
+    def _find_xp_range_for_value(self, value: float, df: pd.DataFrame) -> Optional[int]:
+        """Find which XP range contains the given value. Returns the index in the DataFrame."""
+        for idx, range_val in enumerate(df['XP Range']):
             if range_val.left <= value <= range_val.right:
-                return range_val
+                return idx
         return None
     
     def _generate_static_daily_xp_distribution(self, df: pd.DataFrame, stats: dict, output_path: str) -> str:
@@ -1012,7 +1010,7 @@ class ChartGenerator:
         fig, ax = plt.subplots(figsize=(12, 6))
         
         # Create histogram bars
-        bars = ax.bar(df['XP Range'].astype(str), df['Day Count'], color='#2E86AB', alpha=0.8)
+        bars = ax.bar(df['Range Label'], df['Day Count'], color='#2E86AB', alpha=0.8)
         ax.set_title('Daily XP Distribution')
         ax.set_ylabel('Number of Days')
         ax.set_xlabel('Daily XP Range')
@@ -1288,19 +1286,19 @@ class ChartGenerator:
         
         fig.add_trace(go.Bar(
             x=data['Weekday'],
-            y=data['Average XP'],
-            name='Average XP',
+            y=data['Average Daily XP'],
+            name='Average Daily XP',
             marker_color='#F18F01',
-            hovertemplate='<b>%{x}</b><br>Average XP: %{y:.1f}<extra></extra>'
+            hovertemplate='<b>%{x}</b><br>Average Daily XP: %{y:.1f}<extra></extra>'
         ))
-        
+
         fig.update_layout(
-            title="Average XP by Weekday",
+            title="Average Daily XP by Weekday",
             template='plotly_white',
             height=400,
             showlegend=False,
             xaxis_title="Weekday",
-            yaxis_title="Average XP"
+            yaxis_title="Average Daily XP"
         )
         
         chart_id = 'weekday_chart'
@@ -1309,7 +1307,7 @@ class ChartGenerator:
         
         return f"""
         <div class="chart-container">
-            <div class="chart-title">Average XP by Weekday</div>
+            <div class="chart-title">Average Daily XP by Weekday</div>
             {chart_html}
             <script>{chart_js}</script>
         </div>
@@ -1320,7 +1318,7 @@ class ChartGenerator:
         fig = go.Figure()
         
         fig.add_trace(go.Bar(
-            x=data['XP Range'].astype(str),
+            x=data['Range Label'],
             y=data['Day Count'],
             name='Day Count',
             marker_color='#2E86AB',
@@ -1582,52 +1580,72 @@ class ChartGenerator:
         return daily_efficiency
     
     def _calculate_weekday_distribution(self) -> pd.DataFrame:
-        """Calculate XP distribution by weekday."""
+        """Calculate daily XP distribution by weekday."""
         if self.df.empty:
             return pd.DataFrame()
-        
-        # Group by day of week
-        weekday_stats = self.df.groupby(self.df['date'].dt.day_name()).agg({
-            'xp_numeric': ['sum', 'mean', 'count']
-        }).reset_index()
-        
-        # Flatten column names
-        weekday_stats.columns = ['Weekday', 'Total XP', 'Average XP', 'Task Count']
-        
+
+        # First calculate daily XP totals using a more direct approach
+        df_copy = self.df.copy()
+        df_copy['weekday'] = df_copy['date'].dt.day_name()
+        daily_xp = df_copy.groupby(['date', 'weekday'])['xp_numeric'].sum().reset_index()
+        daily_xp.columns = ['date', 'weekday', 'daily_xp']
+
+        # Then calculate average daily XP for each weekday
+        weekday_stats = daily_xp.groupby('weekday')['daily_xp'].agg(['mean', 'sum', 'count']).reset_index()
+        weekday_stats.columns = ['Weekday', 'Average Daily XP', 'Total XP', 'Number of Days']
+
         # Order weekdays correctly
         weekday_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
         weekday_stats['Weekday'] = pd.Categorical(weekday_stats['Weekday'], categories=weekday_order, ordered=True)
         weekday_stats = weekday_stats.sort_values('Weekday')
-        
+
         # Calculate percentages
         total_xp = weekday_stats['Total XP'].sum()
         weekday_stats['XP Percentage'] = (weekday_stats['Total XP'] / total_xp * 100).round(1)
-        
+
         return weekday_stats
     
     def _calculate_daily_xp_distribution(self) -> pd.DataFrame:
         """Calculate daily XP distribution (histogram of daily XP counts)."""
         if self.df.empty:
             return pd.DataFrame()
-        
+
         # Calculate daily XP totals
         daily_xp = self.df.groupby('date')['xp_numeric'].sum().reset_index()
         daily_xp.columns = ['Date', 'Daily XP']
-        
+
         # Create XP ranges/bins for histogram
         xp_min = daily_xp['Daily XP'].min()
         xp_max = daily_xp['Daily XP'].max()
         xp_mean = daily_xp['Daily XP'].mean()
         xp_median = daily_xp['Daily XP'].median()
-        
-        # Create bins (automatic binning with reasonable intervals)
+
+        # Create bins with integer boundaries
         bins = min(10, len(daily_xp))  # Max 10 bins
         daily_xp['XP Range'] = pd.cut(daily_xp['Daily XP'], bins=bins, include_lowest=True)
-        
+
         # Count days in each XP range
         distribution = daily_xp['XP Range'].value_counts().sort_index().reset_index()
         distribution.columns = ['XP Range', 'Day Count']
-        
+
+        # Format XP Range labels as integers and handle negative ranges separately
+        def format_range_label(range_obj):
+            if range_obj is None:
+                return "Unknown"
+
+            left, right = range_obj.left, range_obj.right
+
+            # Handle negative values
+            if right < 0:
+                return f"{int(left)} to {int(right)}"
+            elif left < 0:
+                return f"{int(left)} to {int(right)}"
+            else:
+                # For non-negative values, use integer format
+                return f"{int(left)}-{int(right)}"
+
+        distribution['Range Label'] = distribution['XP Range'].apply(format_range_label)
+
         # Calculate statistics
         stats = {
             'min_daily_xp': xp_min,
@@ -1636,5 +1654,5 @@ class ChartGenerator:
             'median_daily_xp': xp_median,
             'total_days': len(daily_xp)
         }
-        
+
         return distribution, stats
