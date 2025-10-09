@@ -125,7 +125,7 @@ class ChartGenerator:
         
         # Update layout
         fig.update_layout(
-            title=f"Cumulative XP Progress - {self.data.get('student_name', 'Student')}",
+            title="Cumulative XP Progress",
             xaxis_title="Date",
             yaxis_title="Cumulative XP",
             hovermode='x unified',
@@ -160,7 +160,7 @@ class ChartGenerator:
         plt.fill_between(df['date'], df['cumulative_xp'], alpha=0.3, color='#2E86AB')
         
         # Formatting
-        plt.title(f"Cumulative XP Progress - {self.data.get('student_name', 'Student')}", 
+        plt.title("Cumulative XP Progress",
                  fontsize=16, fontweight='bold')
         plt.xlabel("Date", fontsize=12)
         plt.ylabel("Cumulative XP", fontsize=12)
@@ -239,7 +239,7 @@ class ChartGenerator:
         
         # Update layout
         fig.update_layout(
-            title=f"Daily XP Trend - {self.data.get('student_name', 'Student')}",
+            title="Daily XP Trend",
             xaxis_title="Date",
             yaxis_title="Daily XP",
             hovermode='x unified',
@@ -281,7 +281,7 @@ class ChartGenerator:
                     label='7-Day Average')
         
         # Formatting
-        plt.title(f"Daily XP Trend - {self.data.get('student_name', 'Student')}", 
+        plt.title("Daily XP Trend",
                  fontsize=16, fontweight='bold')
         plt.xlabel("Date", fontsize=12)
         plt.ylabel("Daily XP", fontsize=12)
@@ -379,7 +379,7 @@ class ChartGenerator:
         
         # Update layout
         fig.update_layout(
-            title=f"Learning Progress Dashboard - {self.data.get('student_name', 'Student')}",
+            title="Learning Progress Dashboard",
             template='plotly_white',
             showlegend=True,
             height=800,
@@ -440,7 +440,7 @@ class ChartGenerator:
             subplot_titles=('Task Count Distribution', 'XP Distribution'),
             specs=[[{"type": "pie"}, {"type": "pie"}]]
         )
-        
+
         # Task count pie chart
         fig.add_trace(go.Pie(
             labels=df['Task Type'],
@@ -451,7 +451,7 @@ class ChartGenerator:
             textposition='inside',
             showlegend=False
         ), row=1, col=1)
-        
+
         # XP distribution pie chart
         fig.add_trace(go.Pie(
             labels=df['Task Type'],
@@ -462,19 +462,19 @@ class ChartGenerator:
             textposition='inside',
             showlegend=False
         ), row=1, col=2)
-        
+
         # Update layout
         fig.update_layout(
-            title=f"Task Type Distribution - {self.data.get('student_name', 'Student')}",
+            title="Task Type Distribution",
             template='plotly_white',
             height=500,
             showlegend=True
         )
-        
+
         # Save as HTML
         output_file = f"{output_path}.html"
         fig.write_html(output_file)
-        
+
         return output_file
     
     def _generate_static_task_type_pie(self, df: pd.DataFrame, output_path: str) -> str:
@@ -490,7 +490,7 @@ class ChartGenerator:
         ax2.set_title('XP Distribution')
         
         # Main title
-        fig.suptitle(f"Task Type Distribution - {self.data.get('student_name', 'Student')}", 
+        fig.suptitle("Task Type Distribution",
                     fontsize=16, fontweight='bold')
         
         # Adjust layout
@@ -584,7 +584,7 @@ class ChartGenerator:
         
         # Update layout
         fig.update_layout(
-            title=f"Weekly & Daily XP Statistics - {self.data.get('student_name', 'Student')}",
+            title="Weekly & Daily XP Statistics",
             template='plotly_white',
             height=800,
             showlegend=True
@@ -648,7 +648,7 @@ class ChartGenerator:
         axes[1, 1].tick_params(axis='x', rotation=45)
         
         # Main title
-        fig.suptitle(f"Weekly & Daily XP Statistics - {self.data.get('student_name', 'Student')}", 
+        fig.suptitle("Weekly & Daily XP Statistics",
                     fontsize=16, fontweight='bold')
         
         # Adjust layout
@@ -692,9 +692,9 @@ class ChartGenerator:
             subplot_titles=('Daily Efficiency Rate', 'XP Earned vs Possible'),
             vertical_spacing=0.12,
             specs=[[{"secondary_y": False}],
-                   [{"secondary_y": True}]]
+                   [{"secondary_y": False}]]
         )
-        
+
         # Efficiency rate line
         fig.add_trace(go.Scatter(
             x=df['date'],
@@ -705,7 +705,7 @@ class ChartGenerator:
             marker=dict(size=4),
             hovertemplate='<b>%{x|%Y-%m-%d}</b><br>Efficiency: %{y:.1f}%<extra></extra>'
         ), row=1, col=1)
-        
+
         # 7-day average efficiency
         fig.add_trace(go.Scatter(
             x=df['date'],
@@ -715,8 +715,8 @@ class ChartGenerator:
             line=dict(color='#F18F01', width=3),
             hovertemplate='<b>%{x|%Y-%m-%d}</b><br>7-Day Avg: %{y:.1f}%<extra></extra>'
         ), row=1, col=1)
-        
-        # XP comparison
+
+        # XP comparison on single Y-axis
         fig.add_trace(go.Scatter(
             x=df['date'],
             y=df['Earned XP'],
@@ -726,7 +726,7 @@ class ChartGenerator:
             marker=dict(size=4),
             showlegend=False
         ), row=2, col=1)
-        
+
         fig.add_trace(go.Scatter(
             x=df['date'],
             y=df['Possible XP'],
@@ -735,45 +735,44 @@ class ChartGenerator:
             line=dict(color='#A23B72', width=2, dash='dash'),
             marker=dict(size=4),
             showlegend=False
-        ), row=2, col=1, secondary_y=True)
-        
+        ), row=2, col=1)
+
         # Add 100% efficiency reference line
-        fig.add_hline(y=100, line_dash="dash", line_color="gray", 
+        fig.add_hline(y=100, line_dash="dash", line_color="gray",
                       annotation_text="100% Efficiency", row=1, col=1)
-        
+
         # Update layout
         fig.update_layout(
-            title=f"Learning Efficiency Trend - {self.data.get('student_name', 'Student')}",
+            title="Learning Efficiency Trend",
             template='plotly_white',
             height=800,
             showlegend=True,
             hovermode='x unified'
         )
-        
+
         # Update x-axes
         fig.update_xaxes(title_text="Date", row=1, col=1)
         fig.update_xaxes(title_text="Date", row=2, col=1)
-        
-        # Update y-axes
+
+        # Update y-axes (single Y-axis for XP comparison)
         fig.update_yaxes(title_text="Efficiency Rate (%)", row=1, col=1)
-        fig.update_yaxes(title_text="Earned XP", row=2, col=1)
-        fig.update_yaxes(title_text="Possible XP", row=2, col=1, secondary_y=True)
-        
+        fig.update_yaxes(title_text="XP", row=2, col=1)
+
         # Save as HTML
         output_file = f"{output_path}.html"
         fig.write_html(output_file)
-        
+
         return output_file
     
     def _generate_static_efficiency_trend(self, df: pd.DataFrame, output_path: str) -> str:
         """Generate static efficiency trend chart using Matplotlib."""
         fig, axes = plt.subplots(2, 1, figsize=(14, 10))
-        
+
         # Efficiency rate
-        axes[0].plot(df['date'], df['Efficiency Rate'], 
-                    marker='o', linewidth=2, markersize=4, 
+        axes[0].plot(df['date'], df['Efficiency Rate'],
+                    marker='o', linewidth=2, markersize=4,
                     color='#2E86AB', label='Daily Efficiency')
-        axes[0].plot(df['date'], df['7-Day Avg Efficiency'], 
+        axes[0].plot(df['date'], df['7-Day Avg Efficiency'],
                     linewidth=3, color='#F18F01', label='7-Day Average')
         axes[0].axhline(y=100, color='gray', linestyle='--', alpha=0.7, label='100% Efficiency')
         axes[0].set_title('Learning Efficiency Rate')
@@ -782,13 +781,13 @@ class ChartGenerator:
         axes[0].legend()
         axes[0].tick_params(axis='x', rotation=45)
         axes[0].grid(True, alpha=0.3)
-        
-        # XP comparison
-        axes[1].plot(df['date'], df['Earned XP'], 
-                    marker='o', linewidth=2, markersize=4, 
+
+        # XP comparison on single Y-axis
+        axes[1].plot(df['date'], df['Earned XP'],
+                    marker='o', linewidth=2, markersize=4,
                     color='#2E86AB', label='Earned XP')
-        axes[1].plot(df['date'], df['Possible XP'], 
-                    linewidth=2, linestyle='--', 
+        axes[1].plot(df['date'], df['Possible XP'],
+                    linewidth=2, linestyle='--',
                     color='#A23B72', label='Possible XP')
         axes[1].set_title('XP Earned vs Possible')
         axes[1].set_xlabel('Date')
@@ -796,19 +795,19 @@ class ChartGenerator:
         axes[1].legend()
         axes[1].tick_params(axis='x', rotation=45)
         axes[1].grid(True, alpha=0.3)
-        
+
         # Main title
-        fig.suptitle(f"Learning Efficiency Trend - {self.data.get('student_name', 'Student')}", 
+        fig.suptitle("Learning Efficiency Trend",
                     fontsize=16, fontweight='bold')
-        
+
         # Adjust layout
         plt.tight_layout()
-        
+
         # Save as PNG
         output_file = f"{output_path}.png"
         plt.savefig(output_file, dpi=300, bbox_inches='tight')
         plt.close()
-        
+
         return output_file
     
     def generate_weekday_distribution_chart(self, output_path: Optional[str] = None, 
@@ -850,7 +849,7 @@ class ChartGenerator:
 
         # Update layout
         fig.update_layout(
-            title=f"Average Daily XP by Weekday - {self.data.get('student_name', 'Student')}",
+            title="Average Daily XP by Weekday",
             template='plotly_white',
             height=500,
             showlegend=False,
@@ -869,7 +868,8 @@ class ChartGenerator:
 
         # Average Daily XP by weekday
         bars = ax.bar(df['Weekday'], df['Average Daily XP'], color='#F18F01', alpha=0.8)
-        ax.set_title('Average Daily XP by Weekday')
+        ax.set_title("Average Daily XP by Weekday",
+                    fontsize=16, fontweight='bold')
         ax.set_ylabel('Average Daily XP')
         ax.set_xlabel('Weekday')
         ax.tick_params(axis='x', rotation=45)
@@ -880,10 +880,6 @@ class ChartGenerator:
             height = bar.get_height()
             ax.text(bar.get_x() + bar.get_width()/2., height,
                    f'{height:.1f}', ha='center', va='bottom')
-
-        # Main title
-        fig.suptitle(f"Average Daily XP by Weekday - {self.data.get('student_name', 'Student')}",
-                    fontsize=16, fontweight='bold')
 
         # Adjust layout
         plt.tight_layout()
@@ -982,7 +978,7 @@ class ChartGenerator:
 
         # Update layout
         fig.update_layout(
-            title=f"Daily XP Distribution - {self.data.get('student_name', 'Student')}<br>"
+            title=f"Daily XP Distribution<br>"
                   f"<sub>Mean: {stats['mean_daily_xp']:.1f} XP, Median: {stats['median_daily_xp']:.1f} XP, "
                   f"Range: {stats['min_daily_xp']:.0f}-{stats['max_daily_xp']:.0f} XP</sub>",
             template='plotly_white',
@@ -1008,7 +1004,7 @@ class ChartGenerator:
     def _generate_static_daily_xp_distribution(self, df: pd.DataFrame, stats: dict, output_path: str) -> str:
         """Generate static daily XP distribution chart using Matplotlib."""
         fig, ax = plt.subplots(figsize=(12, 6))
-        
+
         # Create histogram bars
         bars = ax.bar(df['Range Label'], df['Day Count'], color='#2E86AB', alpha=0.8)
         ax.set_title('Daily XP Distribution')
@@ -1016,34 +1012,53 @@ class ChartGenerator:
         ax.set_xlabel('Daily XP Range')
         ax.tick_params(axis='x', rotation=45)
         ax.grid(True, alpha=0.3)
-        
+
         # Add value labels on bars
         for bar in bars:
             height = bar.get_height()
             ax.text(bar.get_x() + bar.get_width()/2., height,
                    f'{int(height)}', ha='center', va='bottom')
-        
-        # Add reference lines for mean and median
-        ax.axvline(stats['mean_daily_xp'], color='red', linestyle='--', alpha=0.7, 
-                  label=f'Mean: {stats["mean_daily_xp"]:.1f} XP')
-        ax.axvline(stats['median_daily_xp'], color='orange', linestyle=':', alpha=0.7, 
-                  label=f'Median: {stats["median_daily_xp"]:.1f} XP')
-        ax.legend()
-        
+
+        # Find which XP range contains the mean and median, then add annotations
+        mean_range_idx = self._find_xp_range_for_value(stats['mean_daily_xp'], df)
+        median_range_idx = self._find_xp_range_for_value(stats['median_daily_xp'], df)
+
+        # Add annotations for mean and median
+        if mean_range_idx is not None:
+            mean_count = df.loc[mean_range_idx, 'Day Count']
+            ax.annotate(f'Mean: {stats["mean_daily_xp"]:.1f}',
+                       xy=(mean_range_idx, mean_count),
+                       xytext=(mean_range_idx, mean_count * 1.3),
+                       ha='center',
+                       arrowprops=dict(arrowstyle='->', color='red', lw=2),
+                       bbox=dict(boxstyle='round,pad=0.3', facecolor='white', edgecolor='red'),
+                       fontsize=10, color='red', fontweight='bold')
+
+        if median_range_idx is not None:
+            median_count = df.loc[median_range_idx, 'Day Count']
+            ax.annotate(f'Median: {stats["median_daily_xp"]:.1f}',
+                       xy=(median_range_idx, median_count),
+                       xytext=(median_range_idx, median_count * 1.5),
+                       ha='center',
+                       arrowprops=dict(arrowstyle='->', color='orange', lw=2),
+                       bbox=dict(boxstyle='round,pad=0.3', facecolor='white', edgecolor='orange'),
+                       fontsize=10, color='orange', fontweight='bold')
+
         # Main title with statistics
-        fig.suptitle(f"Daily XP Distribution - {self.data.get('student_name', 'Student')}\n"
+        fig.suptitle(f"Daily XP Distribution\n"
                     f"Mean: {stats['mean_daily_xp']:.1f} XP, Median: {stats['median_daily_xp']:.1f} XP, "
-                    f"Range: {stats['min_daily_xp']:.0f}-{stats['max_daily_xp']:.0f} XP", 
+                    f"Range: {stats['min_daily_xp']:.0f}-{stats['max_daily_xp']:.0f} XP",
                     fontsize=14, fontweight='bold')
-        
-        # Adjust layout
+
+        # Adjust layout to make room for annotations
         plt.tight_layout()
-        
+        plt.subplots_adjust(top=0.85)  # Make room for suptitle
+
         # Save as PNG
         output_file = f"{output_path}.png"
         plt.savefig(output_file, dpi=300, bbox_inches='tight')
         plt.close()
-        
+
         return output_file
     
     def generate_comprehensive_dashboard(self, output_path: Optional[str] = None) -> str:
@@ -1110,14 +1125,13 @@ class ChartGenerator:
         charts_html.append(self._generate_efficiency_chart_html(efficiency_data))
         
         # Combine all into final HTML
-        student_name = self.data.get('student_name', 'Student')
         html_content = f"""
         <!DOCTYPE html>
         <html lang="en">
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Learning Analytics Dashboard - {student_name}</title>
+            <title>Learning Analytics Dashboard</title>
             <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
             <style>
                 body {{
@@ -1200,7 +1214,7 @@ class ChartGenerator:
         <body>
             <div class="header">
                 <h1>Learning Analytics Dashboard</h1>
-                <p>Comprehensive analysis for {student_name}</p>
+                <p>Comprehensive learning analysis</p>
             </div>
             
             {''.join(charts_html)}
