@@ -65,7 +65,10 @@ class ChartGenerator:
         # Group by date and sum XP
         daily_xp = self.df.groupby('date')['xp_numeric'].sum().reset_index()
 
-        # Calculate cumulative sum
+        # CRITICAL: Sort by date to ensure correct cumulative calculation
+        daily_xp = daily_xp.sort_values('date')
+
+        # Calculate cumulative sum (now in correct date order)
         daily_xp['cumulative_xp'] = daily_xp['xp_numeric'].cumsum()
 
         return daily_xp
@@ -113,7 +116,10 @@ class ChartGenerator:
         # Merge with dominant course info
         daily_data = pd.merge(daily_total, dominant_course[['date', 'dominant_course']], on='date', how='left')
 
-        # Calculate cumulative XP
+        # CRITICAL: Sort by date to ensure correct cumulative calculation
+        daily_data = daily_data.sort_values('date')
+
+        # Calculate cumulative XP (now in correct date order)
         daily_data['cumulative_xp'] = daily_data['xp_numeric'].cumsum()
 
         # Fill missing dominant course (for days with no data)
@@ -330,6 +336,10 @@ class ChartGenerator:
             for segment, course in segments:
                 color = colors.get(course, colors['Unknown'])
 
+                # Create custom hover text for each data point
+                hover_text = [f'<b>{date.strftime("%Y-%m-%d")}</b><br>Cumulative XP: {cum_xp}<br>Daily XP: {daily_xp}<br>Main Course: {course}'
+                              for date, cum_xp, daily_xp in zip(segment['date'], segment['cumulative_xp'], segment['xp_numeric'])]
+
                 fig.add_trace(go.Scatter(
                     x=segment['date'],
                     y=segment['cumulative_xp'],
@@ -337,8 +347,8 @@ class ChartGenerator:
                     name=f'Cumulative XP ({course})',
                     line=dict(color=color, width=3),
                     marker=dict(size=6),
-                    hovertemplate=f'<b>%{{x|%Y-%m-%d}}</b><br>Cumulative XP: %{{y}}<br>Daily XP: %{{customdata}}<br>Main Course: {course}<extra></extra>',
-                    customdata=segment['xp_numeric'],
+                    hovertext=hover_text,
+                    hovertemplate='%{hovertext}<extra></extra>',
                     showlegend=False
                 ))
 
@@ -357,7 +367,7 @@ class ChartGenerator:
             title="Cumulative XP Progress",
             xaxis_title="Date",
             yaxis_title="Cumulative XP",
-            hovermode='x unified',
+            hovermode='closest',
             template='plotly_white',
             showlegend=True,
             height=600,
