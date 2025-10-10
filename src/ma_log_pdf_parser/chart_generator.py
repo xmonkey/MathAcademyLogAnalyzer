@@ -1382,55 +1382,24 @@ class ChartGenerator:
         if output_path is None:
             output_path = self.json_path.parent / "comprehensive_dashboard"
         
-        # Generate all chart data
-        try:
-            # Get statistics
-            stats = self.get_xp_statistics()
-            
-            # Generate all charts
-            task_type_data = self._calculate_task_type_distribution()
-            weekday_data = self._calculate_weekday_distribution()
-            daily_dist_data, daily_dist_stats = self._calculate_daily_xp_distribution()
-            weekly_daily_data = self._calculate_weekly_daily_stats()
-            efficiency_data = self._calculate_efficiency_trend()
-            
-            # Generate the comprehensive dashboard
-            return self._generate_comprehensive_dashboard_html(
-                stats, task_type_data, weekday_data, daily_dist_data, 
-                daily_dist_stats, weekly_daily_data, efficiency_data, output_path
-            )
-        except Exception as e:
-            # Fallback: generate existing dashboard
-            return self.generate_combined_xp_dashboard(str(output_path))
+        # Get statistics only
+        stats = self.get_xp_statistics()
+
+        # Generate the dashboard with Performance Summary only
+        return self._generate_comprehensive_dashboard_html(
+            stats, None, None, None, None, None, None, output_path
+        )
     
-    def _generate_comprehensive_dashboard_html(self, stats: dict, task_type_data: pd.DataFrame, 
+    def _generate_comprehensive_dashboard_html(self, stats: dict, task_type_data: pd.DataFrame,
                                                weekday_data: pd.DataFrame, daily_dist_data: pd.DataFrame,
-                                               daily_dist_stats: dict, weekly_daily_data: dict, 
+                                               daily_dist_stats: dict, weekly_daily_data: dict,
                                                efficiency_data: pd.DataFrame, output_path: str) -> str:
-        """Generate comprehensive dashboard HTML with all charts."""
-        
-        # Generate individual chart components
-        charts_html = []
-        
-        # 1. Statistics Summary
-        charts_html.append(self._generate_stats_summary_html(stats))
-        
-        # 2. Task Type Distribution
-        charts_html.append(self._generate_task_type_chart_html(task_type_data))
-        
-        # 3. Weekday Distribution
-        charts_html.append(self._generate_weekday_chart_html(weekday_data))
-        
-        # 4. Daily XP Distribution
-        charts_html.append(self._generate_daily_dist_chart_html(daily_dist_data, daily_dist_stats))
-        
-        # 5. XP Trend Charts
-        charts_html.append(self._generate_xp_trends_charts_html(weekly_daily_data))
-        
-        # 6. Efficiency Trend
-        charts_html.append(self._generate_efficiency_chart_html(efficiency_data))
-        
-        # Combine all into final HTML
+        """Generate comprehensive dashboard HTML with Performance Summary only."""
+
+        # Generate only the Performance Summary component
+        charts_html = [self._generate_stats_summary_html(stats)]
+
+        # Combine into final HTML
         html_content = f"""
         <!DOCTYPE html>
         <html lang="en">
@@ -1438,7 +1407,6 @@ class ChartGenerator:
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Learning Analytics Dashboard</title>
-            <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
             <style>
                 body {{
                     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -1502,15 +1470,7 @@ class ChartGenerator:
                     opacity: 0.9;
                     margin: 5px 0 0 0;
                 }}
-                .two-column {{
-                    display: grid;
-                    grid-template-columns: 1fr 1fr;
-                    gap: 20px;
-                }}
                 @media (max-width: 768px) {{
-                    .two-column {{
-                        grid-template-columns: 1fr;
-                    }}
                     .stats-grid {{
                         grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
                     }}
@@ -1520,11 +1480,11 @@ class ChartGenerator:
         <body>
             <div class="header">
                 <h1>Learning Analytics Dashboard</h1>
-                <p>Comprehensive learning analysis</p>
+                <p>Performance Summary</p>
             </div>
-            
+
             {''.join(charts_html)}
-            
+
             <div style="text-align: center; margin-top: 40px; padding: 20px; color: #666;">
                 <p>Generated on {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
                 <p>MA Log PDF Parser - Learning Analytics</p>
@@ -1532,12 +1492,12 @@ class ChartGenerator:
         </body>
         </html>
         """
-        
+
         # Save as HTML
         output_file = f"{output_path}.html"
         with open(output_file, 'w', encoding='utf-8') as f:
             f.write(html_content)
-        
+
         return output_file
     
     def _generate_stats_summary_html(self, stats: dict) -> str:
