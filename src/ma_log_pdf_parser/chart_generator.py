@@ -39,36 +39,87 @@ class ChartGenerator:
     def _process_data(self) -> pd.DataFrame:
         """Process JSON data into pandas DataFrame."""
         activities = self.data.get('activities', [])
-        
+
         if not activities:
             return pd.DataFrame()
-        
+
         # Convert to DataFrame
         df = pd.DataFrame(activities)
-        
+
         # Convert date strings to datetime
         df['date'] = pd.to_datetime(df['Date'])
-        
+
         # Extract XP values (handle both string and numeric)
         df['xp_numeric'] = pd.to_numeric(df['XP Earned'], errors='coerce')
-        
+
         # Sort by date
         df = df.sort_values('date')
-        
+
         return df
     
     def _calculate_cumulative_xp(self) -> pd.DataFrame:
         """Calculate cumulative XP by date."""
         if self.df.empty:
             return pd.DataFrame()
-        
+
         # Group by date and sum XP
         daily_xp = self.df.groupby('date')['xp_numeric'].sum().reset_index()
-        
+
         # Calculate cumulative sum
         daily_xp['cumulative_xp'] = daily_xp['xp_numeric'].cumsum()
-        
+
         return daily_xp
+
+    def _calculate_cumulative_xp_by_course(self) -> pd.DataFrame:
+        """Calculate cumulative XP by date and course."""
+        if self.df.empty:
+            return pd.DataFrame()
+
+        # Group by date and course, sum XP
+        daily_course_xp = self.df.groupby(['date', 'Course'])['xp_numeric'].sum().reset_index()
+
+        # Sort by date and course
+        daily_course_xp = daily_course_xp.sort_values(['date', 'Course'])
+
+        # Calculate cumulative sum for each course
+        daily_course_xp['cumulative_xp'] = daily_course_xp.groupby('Course')['xp_numeric'].cumsum()
+
+        # Also calculate overall cumulative total for reference
+        overall_daily = daily_course_xp.groupby('date')['xp_numeric'].sum().reset_index()
+        overall_daily['cumulative_xp'] = overall_daily['xp_numeric'].cumsum()
+        overall_daily['Course'] = 'Total'
+        overall_daily = overall_daily[['date', 'Course', 'xp_numeric', 'cumulative_xp']]
+
+        # Combine course data with total
+        result = pd.concat([daily_course_xp, overall_daily], ignore_index=True)
+
+        return result
+
+    def _calculate_cumulative_xp_with_dominant_course(self) -> pd.DataFrame:
+        """Calculate cumulative XP with dominant course color for each day."""
+        if self.df.empty:
+            return pd.DataFrame()
+
+        # Group by date and course, sum XP
+        daily_course_xp = self.df.groupby(['date', 'Course'])['xp_numeric'].sum().reset_index()
+
+        # Find the dominant course for each day (course with most XP)
+        dominant_course = daily_course_xp.loc[daily_course_xp.groupby('date')['xp_numeric'].idxmax()]
+        dominant_course = dominant_course.rename(columns={'Course': 'dominant_course'})
+
+        # Calculate daily total XP
+        daily_total = self.df.groupby('date')['xp_numeric'].sum().reset_index()
+
+        # Merge with dominant course info
+        daily_data = pd.merge(daily_total, dominant_course[['date', 'dominant_course']], on='date', how='left')
+
+        # Calculate cumulative XP
+        daily_data['cumulative_xp'] = daily_data['xp_numeric'].cumsum()
+
+        # Fill missing dominant course (for days with no data)
+        daily_data['dominant_course'] = daily_data['dominant_course'].fillna('Unknown')
+
+        return daily_data
     
     def _calculate_daily_xp(self) -> pd.DataFrame:
         """Calculate daily XP with date range coverage."""
@@ -107,22 +158,63 @@ class ChartGenerator:
     
     def _generate_interactive_cumulative_xp(self, df: pd.DataFrame, output_path: str) -> str:
         """Generate interactive cumulative XP chart using Plotly."""
+        # Calculate cumulative XP with dominant course colors
+        colored_df = self._calculate_cumulative_xp_with_dominant_course()
+
         fig = go.Figure()
-        
-        # Add cumulative XP line
-        fig.add_trace(go.Scatter(
-            x=df['date'],
-            y=df['cumulative_xp'],
-            mode='lines+markers',
-            name='Cumulative XP',
-            line=dict(color='#2E86AB', width=3),
-            marker=dict(size=6),
-            hovertemplate='<b>%{x|%Y-%m-%d}</b><br>Cumulative XP: %{y}<extra></extra>'
-        ))
-        
-        # Milestone annotations disabled due to plotly compatibility issue
-        # TODO: Re-enable when plotly compatibility is resolved
-        
+
+        # Define colors for different courses
+        colors = {
+            'Integrated Math I (Honors)': '#A23B72',
+            'Prealgebra': '#F18F01',
+            '5Th Grade Math': '#C73E1D',
+            '4Th Grade Math': '#666666',
+            'Algebra': '#4ECDC4',
+            'Geometry': '#95E77E',
+            'Unknown': '#2E86AB'  # Default color
+        }
+
+        # Create segments for different colors
+        if not colored_df.empty:
+            # Split the data into segments where the dominant course changes
+            segments = []
+            current_course = colored_df.iloc[0]['dominant_course']
+            start_idx = 0
+
+            for i in range(1, len(colored_df)):
+                if colored_df.iloc[i]['dominant_course'] != current_course:
+                    # Create a segment from start_idx to i-1
+                    segment = colored_df.iloc[start_idx:i]
+                    segments.append((segment, current_course))
+                    current_course = colored_df.iloc[i]['dominant_course']
+                    start_idx = i
+
+            # Add the last segment
+            segment = colored_df.iloc[start_idx:]
+            segments.append((segment, current_course))
+
+            # Add each segment as a separate trace
+            for segment, course in segments:
+                color = colors.get(course, colors['Unknown'])
+
+                fig.add_trace(go.Scatter(
+                    x=segment['date'],
+                    y=segment['cumulative_xp'],
+                    mode='lines+markers',
+                    name=f'Cumulative XP ({course})',
+                    line=dict(color=color, width=3),
+                    marker=dict(size=6),
+                    hovertemplate=f'<b>%{{x|%Y-%m-%d}}</b><br>Cumulative XP: %{{y}}<br>Main Course: {course}<extra></extra>',
+                    showlegend=False
+                ))
+
+        # Create a custom legend showing course colors
+        legend_items = []
+        for course in sorted(set(colored_df['dominant_course'])):
+            if course != 'Unknown':
+                color = colors.get(course, colors['Unknown'])
+                legend_items.append(f'<span style="color:{color}">●</span> {course}')
+
         # Update layout
         fig.update_layout(
             title="Cumulative XP Progress",
@@ -135,56 +227,126 @@ class ChartGenerator:
             xaxis=dict(
                 tickformat='%Y-%m-%d',
                 tickangle=45
+            ),
+            legend=dict(
+                title="Course",
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="right",
+                x=1
             )
         )
-        
+
+        # Add a single trace for the legend
+        if not colored_df.empty:
+            unique_courses = colored_df['dominant_course'].unique()
+            for course in sorted(unique_courses):
+                if course != 'Unknown':
+                    color = colors.get(course, colors['Unknown'])
+                    fig.add_trace(go.Scatter(
+                        x=[None], y=[None],
+                        mode='markers',
+                        name=course,
+                        marker=dict(color=color, size=10),
+                        showlegend=True
+                    ))
+
         # Save as HTML
         output_file = f"{output_path}.html"
         fig.write_html(output_file)
-        
+
         return output_file
     
     def _generate_static_cumulative_xp(self, df: pd.DataFrame, output_path: str) -> str:
         """Generate static cumulative XP chart using Matplotlib."""
-        plt.figure(figsize=(12, 6))
-        
+        # Calculate cumulative XP with dominant course colors
+        colored_df = self._calculate_cumulative_xp_with_dominant_course()
+
+        plt.figure(figsize=(14, 8))
+
         # Set style
         plt.style.use('default')
-        
-        # Plot cumulative XP
-        plt.plot(df['date'], df['cumulative_xp'], 
-                marker='o', linewidth=2, markersize=6, 
-                color='#2E86AB', label='Cumulative XP')
-        
-        # Fill area under curve
-        plt.fill_between(df['date'], df['cumulative_xp'], alpha=0.3, color='#2E86AB')
-        
+
+        # Define colors for different courses
+        colors = {
+            'Integrated Math I (Honors)': '#A23B72',
+            'Prealgebra': '#F18F01',
+            '5Th Grade Math': '#C73E1D',
+            '4Th Grade Math': '#666666',
+            'Algebra': '#4ECDC4',
+            'Geometry': '#95E77E',
+            'Unknown': '#2E86AB'  # Default color
+        }
+
+        # Plot colored segments
+        if not colored_df.empty:
+            # Split the data into segments where the dominant course changes
+            segments = []
+            current_course = colored_df.iloc[0]['dominant_course']
+            start_idx = 0
+
+            for i in range(1, len(colored_df)):
+                if colored_df.iloc[i]['dominant_course'] != current_course:
+                    # Create a segment from start_idx to i-1
+                    segment = colored_df.iloc[start_idx:i]
+                    segments.append((segment, current_course))
+                    current_course = colored_df.iloc[i]['dominant_course']
+                    start_idx = i
+
+            # Add the last segment
+            segment = colored_df.iloc[start_idx:]
+            segments.append((segment, current_course))
+
+            # Plot each segment with its color
+            for segment, course in segments:
+                color = colors.get(course, colors['Unknown'])
+
+                plt.plot(segment['date'], segment['cumulative_xp'],
+                        marker='o', linewidth=3, markersize=6,
+                        color=color, alpha=0.9)
+
+                # Add subtle fill under each segment
+                plt.fill_between(segment['date'], segment['cumulative_xp'],
+                               alpha=0.2, color=color)
+
         # Formatting
         plt.title("Cumulative XP Progress",
                  fontsize=16, fontweight='bold')
         plt.xlabel("Date", fontsize=12)
         plt.ylabel("Cumulative XP", fontsize=12)
-        
+
         # Format x-axis
         plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
         interval = max(1, len(df) // 10)
         plt.gca().xaxis.set_major_locator(mdates.DayLocator(interval=interval))
         plt.xticks(rotation=45)
-        
+
+        # Format y-axis with commas
+        plt.gca().yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{int(x):,}'))
+
         # Add grid
         plt.grid(True, alpha=0.3)
-        
-        # Add legend
-        plt.legend()
-        
-        # Adjust layout
+
+        # Create custom legend
+        legend_elements = []
+        for course in sorted(set(colored_df['dominant_course'])):
+            if course != 'Unknown':
+                color = colors.get(course, colors['Unknown'])
+                legend_elements.append(plt.Line2D([0], [0], color=color, linewidth=3, label=course))
+
+        if legend_elements:
+            plt.legend(handles=legend_elements, loc='upper left', framealpha=0.95,
+                      bbox_to_anchor=(0.02, 0.98), fancybox=True, shadow=True)
+
+        # Adjust layout to make room for legend
         plt.tight_layout()
-        
+
         # Save as PNG
         output_file = f"{output_path}.png"
         plt.savefig(output_file, dpi=300, bbox_inches='tight')
         plt.close()
-        
+
         return output_file
     
     def generate_daily_xp_chart(self, output_path: Optional[str] = None, 
