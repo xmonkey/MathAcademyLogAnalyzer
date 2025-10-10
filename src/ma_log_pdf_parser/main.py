@@ -455,6 +455,31 @@ def generate_all(pdf_path, output_dir, name, static_only, interactive_only, data
                 )
                 generated_files.append(f"Interactive Task Type: {task_type_path}")
 
+                # Generate additional interactive charts
+                weekly_daily_path = chart_gen.generate_weekly_daily_stats_chart(
+                    str(charts_dir / f"{base_name}_weekly_daily_stats"),
+                    interactive=True
+                )
+                generated_files.append(f"Interactive Weekly/Daily Stats: {weekly_daily_path}")
+
+                efficiency_path = chart_gen.generate_efficiency_trend_chart(
+                    str(charts_dir / f"{base_name}_efficiency_trend"),
+                    interactive=True
+                )
+                generated_files.append(f"Interactive Efficiency Trend: {efficiency_path}")
+
+                weekday_path = chart_gen.generate_weekday_distribution_chart(
+                    str(charts_dir / f"{base_name}_weekday_distribution"),
+                    interactive=True
+                )
+                generated_files.append(f"Interactive Weekday Distribution: {weekday_path}")
+
+                daily_dist_path = chart_gen.generate_daily_xp_distribution_chart(
+                    str(charts_dir / f"{base_name}_daily_xp_distribution"),
+                    interactive=True
+                )
+                generated_files.append(f"Interactive Daily XP Distribution: {daily_dist_path}")
+
                 click.echo(f"    ✓ Generated interactive charts in {charts_dir}")
 
             # Generate static charts
@@ -485,6 +510,31 @@ def generate_all(pdf_path, output_dir, name, static_only, interactive_only, data
                     interactive=False
                 )
                 generated_files.append(f"Static Task Type: {static_task_type_path}")
+
+                # Generate additional static charts
+                static_weekly_daily_path = chart_gen.generate_weekly_daily_stats_chart(
+                    str(charts_dir / f"{base_name}_weekly_daily_stats_static"),
+                    interactive=False
+                )
+                generated_files.append(f"Static Weekly/Daily Stats: {static_weekly_daily_path}")
+
+                static_efficiency_path = chart_gen.generate_efficiency_trend_chart(
+                    str(charts_dir / f"{base_name}_efficiency_trend_static"),
+                    interactive=False
+                )
+                generated_files.append(f"Static Efficiency Trend: {static_efficiency_path}")
+
+                static_weekday_path = chart_gen.generate_weekday_distribution_chart(
+                    str(charts_dir / f"{base_name}_weekday_distribution_static"),
+                    interactive=False
+                )
+                generated_files.append(f"Static Weekday Distribution: {static_weekday_path}")
+
+                static_daily_dist_path = chart_gen.generate_daily_xp_distribution_chart(
+                    str(charts_dir / f"{base_name}_daily_xp_distribution_static"),
+                    interactive=False
+                )
+                generated_files.append(f"Static Daily XP Distribution: {static_daily_dist_path}")
 
                 click.echo(f"    ✓ Generated static charts in {charts_dir}")
 
