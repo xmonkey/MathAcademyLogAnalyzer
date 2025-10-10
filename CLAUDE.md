@@ -8,12 +8,12 @@ This is a Python project for parsing course progress data from PDF activity logs
 
 ## Current State
 
-- Directory: `/Users/xiaobin/project/ma_new`
-- Status: Active Python project with PDF parsing CLI tools
+- Directory: `/Users/xiaobin/project/math_academy/MathAcademyLogAnalyzer`
+- Status: Active Python project with PDF parsing CLI tools and data visualization features
 - Package: `MathAcademyLogAnalyzer` version 0.1.0 (CLI: `mathacademy-analyzer`)
-- Virtual environment: `venv/` (Python 3.9+)
 - Key dependency: pdfplumber>=0.9.0 for PDF processing
 - Documentation: Bilingual (English/Chinese) README files
+- Data directory: Contains processed student activity logs, charts, and exports
 
 ## Data Source: Math Academy Activity Logs
 
@@ -49,10 +49,7 @@ This is a Python project for parsing course progress data from PDF activity logs
 
 ### Environment Setup
 ```bash
-# Activate virtual environment
-source venv/bin/activate
-
-# Install package in development mode
+# Install package in development mode (no virtual environment needed)
 pip install -e .
 
 # Install development dependencies
@@ -117,16 +114,20 @@ mathacademy-analyzer chart data.json --chart-type dashboard
 
 # Show XP statistics
 mathacademy-analyzer stats data.json
+
+# Generate comprehensive learning dashboard
+mathacademy-analyzer chart data.json --chart-type dashboard
 ```
 
 ## Project Architecture
 
 ### Directory Structure
 - `src/ma_log_pdf_parser/` - Main package source code
-- `tests/` - Test files (pytest)
-- `venv/` - Virtual environment (gitignored)
+- `data/` - Contains processed activity logs, charts, and exported data
 - `pyproject.toml` - Project configuration and dependencies
 - `.gitignore` - Git ignore rules for Python
+- `README.md`, `README_zh.md` - Project documentation (English/Chinese)
+- `CLAUDE.md` - This file with project guidance for Claude Code
 
 ### Key Files
 - `src/ma_log_pdf_parser/main.py` - Main CLI application with PDF parsing commands
@@ -135,6 +136,16 @@ mathacademy-analyzer stats data.json
 - `src/ma_log_pdf_parser/__init__.py` - Package initialization with version
 - `requirements.txt` - Core dependencies including pdfplumber
 - `requirements-dev.txt` - Development dependencies
+
+### Data Directory Contents
+The `data/` directory contains:
+- **PDF files**: Original Math Academy activity logs (e.g., `xiaobin_activity_log_2025-10-10.pdf`)
+- **JSON files**: Parsed activity data extracted from PDFs
+- **Excel files**: Exported course progress data for spreadsheet analysis
+- **HTML files**: Interactive chart visualizations (e.g., `daily_xp.html`, `cumulative_xp.html`)
+- **PNG files**: Static chart images for reports
+- **Charts directory**: Organized visualization outputs
+- **Output directories**: Various processed data exports and test results
 
 ### Configuration
 - **pyproject.toml**: Modern Python project configuration with:
@@ -165,11 +176,11 @@ mathacademy-analyzer stats data.json
 
 ## Development Workflow
 
-1. Always work with virtual environment activated: `source venv/bin/activate`
-2. Install changes: `pip install -e .` after modifying `pyproject.toml`
-3. Run tests before committing: `pytest`
-4. Format code: `black .`
-5. Type check: `mypy src/`
+1. Install changes: `pip install -e .` after modifying `pyproject.toml`
+2. Run tests before committing: `pytest`
+3. Format code: `black .`
+4. Type check: `mypy src/`
+5. Test with sample data: Use files in `data/` directory for development testing
 
 ## PDF Processing Notes
 
@@ -178,3 +189,12 @@ mathacademy-analyzer stats data.json
 - Supports table extraction with position data
 - Provides comprehensive text search functionality
 - All commands support output to file for large results
+
+## Data Analysis Features
+
+The project supports comprehensive learning activity analysis:
+- **Learning Heatmaps**: GitHub-style activity visualization showing daily learning patterns
+- **XP Progress Tracking**: Daily and cumulative XP analysis with trend charts
+- **Performance Summaries**: Statistical analysis of learning efficiency and consistency
+- **Date Range Analysis**: Custom time period filtering and streak calculations
+- **Export Options**: Multiple format support (JSON, Excel, HTML, PNG) for reports
