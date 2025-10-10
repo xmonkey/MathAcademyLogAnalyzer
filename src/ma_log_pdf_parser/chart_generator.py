@@ -120,7 +120,146 @@ class ChartGenerator:
         daily_data['dominant_course'] = daily_data['dominant_course'].fillna('Unknown')
 
         return daily_data
-    
+
+    def _get_course_appearance_order(self) -> List[str]:
+        """Get courses in the order they first appear in the data."""
+        if self.df.empty:
+            return []
+
+        # Get unique courses in order of first appearance
+        courses_in_order = []
+        seen_courses = set()
+
+        for _, row in self.df.iterrows():
+            course = row['Course']
+            if course not in seen_courses:
+                courses_in_order.append(course)
+                seen_courses.add(course)
+
+        return courses_in_order
+
+    def _generate_course_colors(self) -> Dict[str, str]:
+        """Generate colors dynamically for all courses in the data.
+
+        Returns:
+            Dictionary mapping course names to color hex codes
+        """
+        if self.df.empty:
+            return {}
+
+        # Get all unique courses
+        all_courses = self.df['Course'].unique().tolist()
+
+        # Color generation strategies for better visual distinction
+        color_palettes = [
+            # Primary palette - distinctive colors
+            ['#A23B72', '#F18F01', '#C73E1D', '#4ECDC4', '#95E77E', '#2E86AB', '#9B59B6', '#E67E22'],
+            # Secondary palette - extended colors
+            ['#3498DB', '#E74C3C', '#F39C12', '#27AE60', '#8E44AD', '#16A085', '#D35400', '#2980B9'],
+            # Tertiary palette - more variations
+            ['#1ABC9C', '#34495E', '#F1C40F', '#E67E22', '#95A5A6', '#D35400', '#C0392B', '#7F8C8D'],
+            # Additional colors for many courses
+            ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F'],
+            # More diverse colors
+            ['#85C1E2', '#F8B739', '#52B788', '#E76F51', '#8E9AAF', '#C9ADA7', '#F2CC8F', '#81B29A']
+        ]
+
+        # Combine all palettes
+        all_colors = []
+        for palette in color_palettes:
+            all_colors.extend(palette)
+
+        # If we still need more colors, generate them programmatically
+        if len(all_courses) > len(all_colors):
+            additional_colors = self._generate_distinct_colors(len(all_courses) - len(all_colors))
+            all_colors.extend(additional_colors)
+
+        # Assign colors to courses
+        colors = {}
+        for i, course in enumerate(all_courses):
+            if i < len(all_colors):
+                colors[course] = all_colors[i]
+            else:
+                # Fallback to generated color
+                colors[course] = self._generate_distinct_colors(1)[0]
+
+        return colors
+
+    def print_course_colors(self) -> None:
+        """Print the color assignments for all courses.
+
+        This method is useful for debugging and for users to see
+        which colors are assigned to which courses.
+        """
+        colors = self._generate_course_colors()
+
+        if not colors:
+            print("No courses found or no data available.")
+            return
+
+        print("Course Color Assignments:")
+        print("-" * 40)
+
+        for course, color in colors.items():
+            print(f"{course:30} {color}")
+
+        print(f"\nTotal courses: {len(colors)}")
+
+    def _generate_distinct_colors(self, count: int) -> List[str]:
+        """Generate visually distinct colors programmatically.
+
+        Args:
+            count: Number of colors to generate
+
+        Returns:
+            List of hex color codes
+        """
+        colors = []
+
+        # Use HSV color space for better distribution
+        golden_ratio = 0.618033988749895
+        h = 0.5  # Start hue
+
+        for i in range(count):
+            # Generate hue with golden ratio for better distribution
+            h = (h + golden_ratio) % 1.0
+
+            # Vary saturation and value for more distinction
+            saturation = 0.6 + (i % 3) * 0.15  # 0.6, 0.75, 0.9
+            value = 0.7 + (i % 2) * 0.2        # 0.7, 0.9
+
+            # Convert HSV to RGB
+            import colorsys
+            rgb = colorsys.hsv_to_rgb(h, saturation, value)
+            hex_color = '#{:02x}{:02x}{:02x}'.format(
+                int(rgb[0] * 255),
+                int(rgb[1] * 255),
+                int(rgb[2] * 255)
+            )
+            colors.append(hex_color)
+
+        return colors
+
+    def _calculate_course_cumulative_xp(self) -> Dict[str, int]:
+        """Calculate cumulative XP for each course.
+
+        Returns:
+            Dictionary mapping course names to their cumulative XP values
+        """
+        if self.df.empty:
+            return {}
+
+        # Group by course and sum XP
+        course_xp = self.df.groupby('Course')['xp_numeric'].sum().reset_index()
+        course_xp.columns = ['Course', 'Cumulative XP']
+
+        # Convert to dictionary
+        course_cumulative_xp = {}
+        for _, row in course_xp.iterrows():
+            course_cumulative_xp[row['Course']] = int(row['Cumulative XP'])
+
+        return course_cumulative_xp
+
     def _calculate_daily_xp(self) -> pd.DataFrame:
         """Calculate daily XP with date range coverage."""
         if self.df.empty:
@@ -163,16 +302,10 @@ class ChartGenerator:
 
         fig = go.Figure()
 
-        # Define colors for different courses
-        colors = {
-            'Integrated Math I (Honors)': '#A23B72',
-            'Prealgebra': '#F18F01',
-            '5Th Grade Math': '#C73E1D',
-            '4Th Grade Math': '#666666',
-            'Algebra': '#4ECDC4',
-            'Geometry': '#95E77E',
-            'Unknown': '#2E86AB'  # Default color
-        }
+        # Generate colors dynamically for all courses
+        colors = self._generate_course_colors()
+        # Ensure we have a default color for unknown courses
+        colors['Unknown'] = '#2E86AB'
 
         # Create segments for different colors
         if not colored_df.empty:
@@ -204,14 +337,18 @@ class ChartGenerator:
                     name=f'Cumulative XP ({course})',
                     line=dict(color=color, width=3),
                     marker=dict(size=6),
-                    hovertemplate=f'<b>%{{x|%Y-%m-%d}}</b><br>Cumulative XP: %{{y}}<br>Main Course: {course}<extra></extra>',
+                    hovertemplate=f'<b>%{{x|%Y-%m-%d}}</b><br>Cumulative XP: %{{y}}<br>Daily XP: %{{customdata}}<br>Main Course: {course}<extra></extra>',
+                    customdata=segment['xp_numeric'],
                     showlegend=False
                 ))
 
-        # Create a custom legend showing course colors
+        # Create a custom legend showing course colors in appearance order
         legend_items = []
-        for course in sorted(set(colored_df['dominant_course'])):
-            if course != 'Unknown':
+        course_order = self._get_course_appearance_order()
+
+        # Filter to only courses that appear as dominant courses, in appearance order
+        for course in course_order:
+            if course in colored_df['dominant_course'].values and course != 'Unknown':
                 color = colors.get(course, colors['Unknown'])
                 legend_items.append(f'<span style="color:{color}">●</span> {course}')
 
@@ -238,16 +375,21 @@ class ChartGenerator:
             )
         )
 
-        # Add a single trace for the legend
+        # Add a single trace for the legend in appearance order
         if not colored_df.empty:
-            unique_courses = colored_df['dominant_course'].unique()
-            for course in sorted(unique_courses):
-                if course != 'Unknown':
+            # Calculate cumulative XP for each course
+            course_cumulative_xp = self._calculate_course_cumulative_xp()
+
+            course_order = self._get_course_appearance_order()
+            for course in course_order:
+                if course in colored_df['dominant_course'].values and course != 'Unknown':
                     color = colors.get(course, colors['Unknown'])
+                    cumulative_xp = course_cumulative_xp.get(course, 0)
+                    legend_name = f"{course} ({cumulative_xp:,} XP)"
                     fig.add_trace(go.Scatter(
                         x=[None], y=[None],
                         mode='markers',
-                        name=course,
+                        name=legend_name,
                         marker=dict(color=color, size=10),
                         showlegend=True
                     ))
@@ -268,16 +410,10 @@ class ChartGenerator:
         # Set style
         plt.style.use('default')
 
-        # Define colors for different courses
-        colors = {
-            'Integrated Math I (Honors)': '#A23B72',
-            'Prealgebra': '#F18F01',
-            '5Th Grade Math': '#C73E1D',
-            '4Th Grade Math': '#666666',
-            'Algebra': '#4ECDC4',
-            'Geometry': '#95E77E',
-            'Unknown': '#2E86AB'  # Default color
-        }
+        # Generate colors dynamically for all courses
+        colors = self._generate_course_colors()
+        # Ensure we have a default color for unknown courses
+        colors['Unknown'] = '#2E86AB'
 
         # Plot colored segments
         if not colored_df.empty:
@@ -328,12 +464,20 @@ class ChartGenerator:
         # Add grid
         plt.grid(True, alpha=0.3)
 
-        # Create custom legend
+        # Create custom legend in appearance order
         legend_elements = []
-        for course in sorted(set(colored_df['dominant_course'])):
-            if course != 'Unknown':
+        course_order = self._get_course_appearance_order()
+
+        # Calculate cumulative XP for each course
+        course_cumulative_xp = self._calculate_course_cumulative_xp()
+
+        # Filter to only courses that appear as dominant courses, in appearance order
+        for course in course_order:
+            if course in colored_df['dominant_course'].values and course != 'Unknown':
                 color = colors.get(course, colors['Unknown'])
-                legend_elements.append(plt.Line2D([0], [0], color=color, linewidth=3, label=course))
+                cumulative_xp = course_cumulative_xp.get(course, 0)
+                label_name = f"{course} ({cumulative_xp:,} XP)"
+                legend_elements.append(plt.Line2D([0], [0], color=color, linewidth=3, label=label_name))
 
         if legend_elements:
             plt.legend(handles=legend_elements, loc='upper left', framealpha=0.95,
