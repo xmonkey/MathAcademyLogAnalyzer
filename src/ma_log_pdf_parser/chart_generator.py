@@ -1387,7 +1387,10 @@ class ChartGenerator:
         )
     
     def _generate_comprehensive_dashboard_html(self, stats: dict, output_path: str) -> str:
-        """Generate simplified dashboard HTML with Performance Summary only."""
+        """Generate simplified dashboard HTML with Performance Summary and Learning Heatmap."""
+
+        # Calculate heatmap data
+        heatmap_data = self._calculate_learning_heatmap_data()
 
         # Save as HTML
         output_file = f"{output_path}.html"
@@ -1462,9 +1465,109 @@ class ChartGenerator:
                     opacity: 0.9;
                     margin: 5px 0 0 0;
                 }}
+                .heatmap-container {{
+                    background: white;
+                    margin: 20px 0;
+                    padding: 20px;
+                    border-radius: 10px;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                }}
+                .heatmap-title {{
+                    font-size: 1.4em;
+                    color: #333;
+                    margin-bottom: 15px;
+                    border-bottom: 2px solid #667eea;
+                    padding-bottom: 10px;
+                }}
+                .heatmap-wrapper {{
+                    overflow-x: auto;
+                    margin-bottom: 20px;
+                }}
+                .heatmap-grid {{
+                    display: grid;
+                    grid-template-columns: 30px repeat(53, 15px);
+                    gap: 3px;
+                    font-size: 12px;
+                    min-width: 850px;
+                }}
+                .weekday-label {{
+                    display: flex;
+                    align-items: center;
+                    justify-content: flex-end;
+                    padding-right: 8px;
+                    font-weight: 400;
+                    color: #586069;
+                    font-size: 10px;
+                    line-height: 15px;
+                    text-transform: none;
+                }}
+                .month-label {{
+                    grid-column: 2 / -1;
+                    display: flex;
+                    align-items: center;
+                    font-weight: 500;
+                    color: #586069;
+                    font-size: 11px;
+                    margin-bottom: 5px;
+                    margin-top: 10px;
+                }}
+                .heatmap-day {{
+                    width: 15px;
+                    height: 15px;
+                    border-radius: 3px;
+                    cursor: pointer;
+                    transition: transform 0.1s ease;
+                    position: relative;
+                }}
+                .heatmap-day:hover {{
+                    transform: scale(1.2);
+                    z-index: 10;
+                }}
+                .heatmap-legend {{
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 10px;
+                    margin-top: 15px;
+                    font-size: 11px;
+                    color: #586069;
+                }}
+                .legend-item {{
+                    display: flex;
+                    align-items: center;
+                    gap: 5px;
+                }}
+                .legend-box {{
+                    width: 15px;
+                    height: 15px;
+                    border-radius: 3px;
+                }}
+                .tooltip {{
+                    position: absolute;
+                    background: rgba(0, 0, 0, 0.8);
+                    color: white;
+                    padding: 8px 12px;
+                    border-radius: 6px;
+                    font-size: 12px;
+                    pointer-events: none;
+                    z-index: 1000;
+                    display: none;
+                    white-space: nowrap;
+                }}
                 @media (max-width: 768px) {{
                     .stats-grid {{
                         grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+                    }}
+                      .heatmap-day {{
+                        width: 12px;
+                        height: 12px;
+                    }}
+                    .weekday-label {{
+                        font-size: 9px;
+                        line-height: 12px;
+                    }}
+                    .month-label {{
+                        font-size: 10px;
                     }}
                 }}
             </style>
@@ -1472,21 +1575,342 @@ class ChartGenerator:
         <body>
             <div class="header">
                 <h1>Learning Analytics Dashboard</h1>
-                <p>Performance Summary</p>
+                <p>Performance Summary & Learning Activity</p>
             </div>
 
             {self._generate_stats_summary_html(stats)}
+
+            {self._generate_learning_heatmap_html(heatmap_data)}
 
             <div style="text-align: center; margin-top: 40px; padding: 20px; color: #666;">
                 <p>Generated on {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
                 <p>MA Log PDF Parser - Learning Analytics</p>
             </div>
+
+            <div class="tooltip" id="tooltip"></div>
         </body>
         </html>
         """)
 
         return output_file
-    
+
+    def _generate_learning_heatmap_html(self, heatmap_data: dict) -> str:
+        """Generate learning heatmap HTML similar to GitHub contribution graph."""
+        if not heatmap_data or not heatmap_data.get('data'):
+            return ""
+
+        data = heatmap_data['data']
+        color_levels = heatmap_data['color_levels']
+        stats = heatmap_data['stats']
+
+        # Convert data to DataFrame for easier manipulation
+        df = pd.DataFrame(data)
+        df['date'] = pd.to_datetime(df['date'])
+
+        # GitHub-style: weeks as columns, days of week as rows
+        # Create week groups (53 weeks in a year) with Sunday-starting weeks
+        df['weekday_num'] = df['date'].dt.weekday  # Monday=0, Sunday=6
+        df['iso_week'] = df['date'].dt.isocalendar().week
+        df['iso_year'] = df['date'].dt.isocalendar().year
+
+        # Calculate GitHub-style week (Sunday-starting)
+        # For GitHub, week changes on Sunday, not Monday
+        # If it's Sunday, it belongs to the next GitHub week
+        github_week_adjustment = ((df['weekday_num'] + 1) % 7)  # Sunday=6 -> 0, Monday=0 -> 1, etc.
+        df['github_week'] = df['iso_week'] + github_week_adjustment
+
+        # Handle year transition when Sunday pushes to next year's week 1
+        year_adjustment = ((df['iso_week'] + github_week_adjustment - 1) // 52)  # Number of 52-week blocks
+        df['github_year'] = df['iso_year'] + year_adjustment
+
+        df['year_week'] = df['github_year'].astype(str) + '-' + df['github_week'].astype(str).str.zfill(2)
+
+        # Get all unique weeks in chronological order (fixed 53 weeks layout)
+        # Make sure current week is the last one
+        all_weeks = sorted(df['year_week'].unique())
+
+        # Get current week to ensure it's included and positioned at the end
+        current_date = datetime.now()
+        current_year_week = f"{current_date.year}-{current_date.isocalendar().week:02d}"
+
+        # Ensure current week is in the list (even if no data)
+        if current_year_week not in all_weeks:
+            all_weeks.append(current_year_week)
+
+        # Take last 53 weeks, ensuring current week is the last one
+        weeks = all_weeks[-53:]  # Last 53 weeks with current week at the end
+
+        # **CRITICAL FIX**:
+        # Sort weeks by actual date to ensure chronological order from left to right
+        # This fixes the main issue where dates weren't in time order
+        week_dates = []
+        for week in weeks:
+            week_data = df[df['year_week'] == week]
+            if not week_data.empty:
+                week_dates.append((week, week_data.iloc[0]['date']))
+
+        # Sort by actual date to ensure proper chronological order
+        week_dates.sort(key=lambda x: x[1])  # Sort by date
+
+        # **INTEGRATION FIX**:
+        # Replace the original weeks array with the chronologically sorted weeks
+        weeks = [week for week, _ in week_dates]
+
+        # Get weekday order starting from Sunday (GitHub style)
+        weekday_order = [6, 0, 1, 2, 3, 4, 5]  # Sun, Mon, Tue, Wed, Thu, Fri, Sat
+        # Remove all weekday labels - completely empty
+        weekday_names = ['', '', '', '', '', '', '']
+
+        # Build month labels (span multiple weeks)
+        month_labels = []
+        current_month = None
+        week_start_index = 0
+
+        for i, week in enumerate(weeks):
+            if not df[df['year_week'] == week].empty:
+                week_data = df[df['year_week'] == week].iloc[0]
+                week_date = week_data['date']
+                month_name = week_data['month_name']
+
+                if month_name != current_month:
+                    if current_month is not None:
+                        # Add previous month label with span
+                        span = i - week_start_index
+                        month_labels.append({
+                            'month': current_month,
+                            'span': span,
+                            'start_index': week_start_index,
+                            'end_index': i - 1
+                        })
+
+                    current_month = month_name
+                    week_start_index = i
+
+        # Add last month
+        if current_month is not None:
+            span = len(weeks) - week_start_index
+            month_labels.append({
+                'month': current_month,
+                'span': span,
+                'start_index': week_start_index,
+                'end_index': len(weeks) - 1
+            })
+
+        # Build the HTML structure row by row
+        heatmap_html = []
+
+        # Row 1: Empty corner cell + Month labels
+        heatmap_html.append('<div></div>')  # Empty corner cell
+        for label in month_labels:
+            # Grid column calculation: start_index + 2 (empty corner + first data column starts at column 2)
+            grid_col = label['start_index'] + 2
+            grid_span = label['span']
+            heatmap_html.append(f'''
+            <div class="month-label" style="grid-column: {grid_col} / span {grid_span};">{label['month']}</div>
+            ''')
+
+        # Create a proper GitHub-style grid: 53 weeks × 7 days = 371 cells max
+        # We need to build the grid week by week, not weekday by weekday
+
+        # First, create a mapping of (week_index, weekday) -> data
+        week_index_map = {week: i for i, week in enumerate(weeks)}
+
+        # Build the data grid: week_index × weekday
+        data_grid = {}
+        for _, row in df.iterrows():
+            week = row['year_week']
+            weekday = row['weekday_num']
+            if week in week_index_map:
+                week_idx = week_index_map[week]
+                data_grid[(week_idx, weekday)] = row
+
+        # **CHRONOLOGICAL GRID FIX**:
+        # Build a proper chronological grid that dates progress from left to right
+        # Create a complete date sequence for the grid
+
+        # **DATE RANGE FIX**: Use a standard 365-day range ending at current date
+        # This ensures the heatmap shows the expected time window (e.g., from Oct 2024 to Oct 2025)
+        max_date = self.df['date'].max()  # Use latest date in data as end point
+
+        # Create exactly 365 days of data (standard GitHub contribution graph)
+        grid_end_date = max_date
+        grid_start_date = max_date - pd.Timedelta(days=364)  # 365 days inclusive
+
+        # **WEEK ALIGNMENT FIX**: Ensure the grid starts on a Sunday and ends on a Saturday
+        # Find the Sunday before our start date to ensure proper week alignment
+        days_since_sunday = (grid_start_date.weekday() + 1) % 7  # Monday=0 -> 1, Sunday=6 -> 0
+        aligned_start_date = grid_start_date - pd.Timedelta(days=days_since_sunday)
+
+        # Find the Saturday after our end date to complete the last week
+        days_until_saturday = (5 - grid_end_date.weekday()) % 7  # Friday=4 -> 1, Saturday=5 -> 0
+        aligned_end_date = grid_end_date + pd.Timedelta(days=days_until_saturday)
+
+        # Create complete date range with proper week alignment
+        grid_dates = pd.date_range(start=aligned_start_date, end=aligned_end_date, freq='D')
+
+        print(f"Grid date range: {aligned_start_date.date()} to {aligned_end_date.date()} ({len(grid_dates)} days)")
+
+        # **SIMPLIFIED GRID APPROACH**:
+        # Build the grid directly using the chronological date sequence
+        # This ensures proper week alignment and fills all cells correctly
+
+        # Convert grid dates to DataFrame for easier lookup
+        grid_df = pd.DataFrame({'date': grid_dates})
+        grid_df['weekday_num'] = grid_df['date'].dt.weekday  # Monday=0, Sunday=6
+
+        # **KEY FIX**: Build week groups starting from Sunday for proper GitHub-style alignment
+        # Find the first Sunday in our grid to serve as week anchor
+        first_sunday = None
+        for date in grid_dates:
+            if date.weekday() == 6:  # Sunday
+                first_sunday = date
+                break
+
+        if first_sunday is None:
+            # If no Sunday found, use the first date and adjust to previous Sunday
+            first_sunday = grid_dates[0]
+            days_to_sunday = (first_sunday.weekday() + 1) % 7
+            first_sunday = first_sunday - pd.Timedelta(days=days_to_sunday)
+
+        print(f"First Sunday anchor: {first_sunday.date()}")
+
+        # **WEEK COLUMN MAPPING**: Map each date to its correct column position
+        week_column_map = {}
+        current_week_start = first_sunday
+        week_col = 0
+
+        # Process dates week by week
+        while current_week_start <= grid_dates[-1] and week_col < 53:
+            # Define the current week (Sunday to Saturday)
+            week_end = current_week_start + pd.Timedelta(days=6)
+
+            # Process each day in this week
+            for day_offset in range(7):
+                current_date = current_week_start + pd.Timedelta(days=day_offset)
+                weekday_idx = current_date.weekday()  # Monday=0, Sunday=6
+
+                # Only add dates that are within our grid range
+                if current_date in grid_dates:
+                    week_column_map[(week_col, weekday_idx)] = current_date
+
+            # Move to next week
+            current_week_start = week_end + pd.Timedelta(days=1)
+            week_col += 1
+
+        print(f"Created week column mapping with {len(week_column_map)} date positions")
+        print(f"Week columns used: {week_col}")
+
+        # Rows 2-8: Weekday labels + heatmap days (7 rows for Sun-Sat)
+        for weekday_idx in weekday_order:
+            # Weekday label (completely empty now)
+            heatmap_html.append('<div class="weekday-label"></div>')
+
+            # Days for this weekday across all weeks - ensure exactly 53 cells per row
+            for week_idx in range(53):  # Fixed 53 weeks for complete grid
+                # **SIMPLIFIED APPROACH**: Get the date for this grid position
+                grid_date = week_column_map.get((week_idx, weekday_idx))
+
+                if grid_date is not None:
+                    # Look for actual data on this date
+                    date_data = df[df['date'].dt.date == grid_date.date()]
+
+                    if not date_data.empty:
+                        # Use actual data
+                        xp = date_data['daily_xp'].iloc[0]
+                        color_level = date_data['color_level'].iloc[0]
+                        color = color_levels[str(color_level)]
+
+                        # Format date for tooltip
+                        date_str = grid_date.strftime('%Y-%m-%d')
+                        day_name = grid_date.strftime('%A')
+                        tooltip_text = f"{date_str} ({day_name})<br>XP: {xp}"
+
+                        heatmap_html.append(f'''
+                        <div class="heatmap-day"
+                             style="background-color: {color};"
+                             data-date="{date_str}"
+                             data-xp="{xp}"
+                             onmouseover="showTooltip(event, '{tooltip_text}')"
+                             onmouseout="hideTooltip()">
+                        </div>
+                        ''')
+                    else:
+                        # No activity data for this date (but date exists in grid)
+                        date_str = grid_date.strftime('%Y-%m-%d')
+                        day_name = grid_date.strftime('%A')
+                        tooltip_text = f"{date_str} ({day_name})<br>XP: 0.0"
+
+                        heatmap_html.append(f'''
+                        <div class="heatmap-day"
+                             style="background-color: {color_levels['0']};"
+                             data-date="{date_str}"
+                             data-xp="0.0"
+                             onmouseover="showTooltip(event, '{tooltip_text}')"
+                             onmouseout="hideTooltip()">
+                        </div>
+                        ''')
+                else:
+                    # Empty cell beyond our date range
+                    heatmap_html.append(f'''
+                    <div class="heatmap-day"
+                         style="background-color: {color_levels['0']};"
+                         data-date=""
+                         data-xp="0.0"
+                         onmouseover="showTooltip(event, 'No data')"
+                         onmouseout="hideTooltip()">
+                    </div>
+                    ''')
+
+        # Combine all parts with fixed 53-week grid template
+        heatmap_html_content = f'''
+        <div class="heatmap-container">
+            <div class="heatmap-title">Learning Activity Heatmap</div>
+
+            <div class="heatmap-wrapper">
+                <div class="heatmap-grid">
+                    {"".join(heatmap_html)}
+                </div>
+            </div>
+
+            <div class="heatmap-legend">
+                <div class="legend-item">
+                    <div class="legend-box" style="background-color: {color_levels['0']};"></div>
+                    <span>No activity</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-box" style="background-color: {color_levels['1']};"></div>
+                    <span>Less than 15 XP</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-box" style="background-color: {color_levels['2']};"></div>
+                    <span>15-29 XP</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-box" style="background-color: {color_levels['3']};"></div>
+                    <span>30+ XP</span>
+                </div>
+            </div>
+
+          </div>
+
+        <script>
+        function showTooltip(event, text) {{
+            const tooltip = document.getElementById('tooltip');
+            tooltip.innerHTML = text;
+            tooltip.style.display = 'block';
+            tooltip.style.left = (event.pageX + 10) + 'px';
+            tooltip.style.top = (event.pageY - 30) + 'px';
+        }}
+
+        function hideTooltip() {{
+            const tooltip = document.getElementById('tooltip');
+            tooltip.style.display = 'none';
+        }}
+        </script>
+        '''
+
+        return heatmap_html_content
+
     def _generate_stats_summary_html(self, stats: dict) -> str:
         """Generate statistics summary HTML."""
         longest_streak = stats.get('longest_streak', {})
@@ -2078,3 +2502,105 @@ class ChartGenerator:
         }
 
         return distribution, stats
+
+    def _calculate_learning_heatmap_data(self) -> Dict[str, Any]:
+        """Calculate learning heatmap data similar to GitHub contribution graph.
+
+        Returns:
+            Dictionary containing heatmap data with dates, XP values, and metadata
+        """
+        if self.df.empty:
+            return {}
+
+        # Calculate daily XP totals
+        daily_xp = self.df.groupby('date')['xp_numeric'].sum().reset_index()
+        daily_xp.columns = ['date', 'daily_xp']
+
+        # Get the last day from the data and create a 1-year range
+        max_date = self.df['date'].max().date()
+        min_date = max_date - pd.Timedelta(days=364)  # Last 365 days (52 weeks)
+
+        # Create a complete date range for the last year
+        date_range = pd.date_range(start=min_date, end=max_date, freq='D')
+
+        # Create a complete dataframe with all dates
+        full_df = pd.DataFrame({'date': date_range})
+
+        # Merge with daily XP data
+        heatmap_df = pd.merge(full_df, daily_xp, on='date', how='left')
+        heatmap_df['daily_xp'] = heatmap_df['daily_xp'].fillna(0)
+
+        # Determine color levels based on XP thresholds
+        def get_color_level(xp):
+            if xp == 0:
+                return 0  # No activity - gray
+            elif xp < 15:
+                return 1  # Light green
+            elif xp < 30:
+                return 2  # Medium green
+            else:
+                return 3  # Dark green
+
+        heatmap_df['color_level'] = heatmap_df['daily_xp'].apply(get_color_level)
+
+        # Add GitHub-style week and day information (Sunday-starting weeks)
+        heatmap_df['weekday_num'] = heatmap_df['date'].dt.weekday  # Monday=0, Sunday=6
+        heatmap_df['weekday_name'] = heatmap_df['date'].dt.strftime('%a')
+        heatmap_df['iso_week'] = heatmap_df['date'].dt.isocalendar().week
+        heatmap_df['iso_year'] = heatmap_df['date'].dt.isocalendar().year
+
+        # Calculate GitHub-style week (Sunday-starting)
+        # For GitHub, week changes on Sunday, not Monday
+        # If it's Sunday, it belongs to the next GitHub week
+        github_week_adjustment = ((heatmap_df['weekday_num'] + 1) % 7)  # Sunday=6 -> 0, Monday=0 -> 1, etc.
+        heatmap_df['github_week'] = heatmap_df['iso_week'] + github_week_adjustment
+
+        # Handle year transition when Sunday pushes to next year's week 1
+        year_adjustment = ((heatmap_df['iso_week'] + github_week_adjustment - 1) // 52)  # Number of 52-week blocks
+        heatmap_df['github_year'] = heatmap_df['iso_year'] + year_adjustment
+
+        heatmap_df['year_week'] = heatmap_df['github_year'].astype(str) + '-' + heatmap_df['github_week'].astype(str).str.zfill(2)
+
+        heatmap_df['weekday_num'] = heatmap_df['date'].dt.weekday  # Monday=0, Sunday=6
+        heatmap_df['weekday_name'] = heatmap_df['date'].dt.strftime('%a')
+        heatmap_df['week_num'] = heatmap_df['github_week']
+        heatmap_df['year'] = heatmap_df['github_year']
+        heatmap_df['month'] = heatmap_df['date'].dt.month
+        # Ensure date is datetime for strftime
+        if not pd.api.types.is_datetime64_any_dtype(heatmap_df['date']):
+            heatmap_df['date'] = pd.to_datetime(heatmap_df['date'])
+        heatmap_df['month_name'] = heatmap_df['date'].dt.strftime('%b')
+        heatmap_df['day'] = heatmap_df['date'].dt.day
+
+        # Calculate statistics
+        total_active_days = (heatmap_df['daily_xp'] > 0).sum()
+        total_days = len(heatmap_df)
+
+        # Calculate current streak (from the end)
+        current_streak = 0
+        for i in range(len(heatmap_df) - 1, -1, -1):
+            if heatmap_df.iloc[i]['daily_xp'] > 0:
+                current_streak += 1
+            else:
+                break
+
+        return {
+            'data': heatmap_df.to_dict('records'),
+            'date_range': {
+                'start': min_date.isoformat(),
+                'end': max_date.isoformat()
+            },
+            'stats': {
+                'total_active_days': int(total_active_days),
+                'total_days': int(total_days),
+                'current_streak': int(current_streak),
+                'max_daily_xp': int(heatmap_df['daily_xp'].max()),
+                'average_xp': float(heatmap_df[heatmap_df['daily_xp'] > 0]['daily_xp'].mean()) if total_active_days > 0 else 0
+            },
+            'color_levels': {
+                '0': '#ebedf0',  # Gray - no activity
+                '1': '#9be9a8',  # Light green - XP < 15
+                '2': '#40c463',  # Medium green - 15 <= XP < 30
+                '3': '#30a14e'   # Dark green - XP >= 30
+            }
+        }
