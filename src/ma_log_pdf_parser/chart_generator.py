@@ -1368,39 +1368,31 @@ class ChartGenerator:
         return output_file
     
     def generate_comprehensive_dashboard(self, output_path: Optional[str] = None) -> str:
-        """Generate comprehensive dashboard with all charts integrated into one page.
-        
+        """Generate simplified dashboard with Performance Summary only.
+
         Args:
             output_path: Output path for the dashboard file
-            
+
         Returns:
             Path to the generated dashboard file
         """
         if self.df.empty:
             raise ValueError("No data available for chart generation")
-        
+
         if output_path is None:
             output_path = self.json_path.parent / "comprehensive_dashboard"
-        
-        # Get statistics only
-        stats = self.get_xp_statistics()
 
-        # Generate the dashboard with Performance Summary only
         return self._generate_comprehensive_dashboard_html(
-            stats, None, None, None, None, None, None, output_path
+            self.get_xp_statistics(), output_path
         )
     
-    def _generate_comprehensive_dashboard_html(self, stats: dict, task_type_data: pd.DataFrame,
-                                               weekday_data: pd.DataFrame, daily_dist_data: pd.DataFrame,
-                                               daily_dist_stats: dict, weekly_daily_data: dict,
-                                               efficiency_data: pd.DataFrame, output_path: str) -> str:
-        """Generate comprehensive dashboard HTML with Performance Summary only."""
+    def _generate_comprehensive_dashboard_html(self, stats: dict, output_path: str) -> str:
+        """Generate simplified dashboard HTML with Performance Summary only."""
 
-        # Generate only the Performance Summary component
-        charts_html = [self._generate_stats_summary_html(stats)]
-
-        # Combine into final HTML
-        html_content = f"""
+        # Save as HTML
+        output_file = f"{output_path}.html"
+        with open(output_file, 'w', encoding='utf-8') as f:
+            f.write(f"""
         <!DOCTYPE html>
         <html lang="en">
         <head>
@@ -1483,7 +1475,7 @@ class ChartGenerator:
                 <p>Performance Summary</p>
             </div>
 
-            {''.join(charts_html)}
+            {self._generate_stats_summary_html(stats)}
 
             <div style="text-align: center; margin-top: 40px; padding: 20px; color: #666;">
                 <p>Generated on {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
@@ -1491,12 +1483,7 @@ class ChartGenerator:
             </div>
         </body>
         </html>
-        """
-
-        # Save as HTML
-        output_file = f"{output_path}.html"
-        with open(output_file, 'w', encoding='utf-8') as f:
-            f.write(html_content)
+        """)
 
         return output_file
     
