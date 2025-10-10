@@ -30,15 +30,7 @@ pip install -e .
 
 ### 3. Analyze
 ```bash
-# Option 1: Quick analysis
-mathacademy-analyzer export activity_log.pdf output.xlsx
-mathacademy-analyzer chart output.json
-
-# Option 2: Generate all outputs at once (Recommended)
 mathacademy-analyzer generate-all activity_log.pdf -o output_folder
-
-# View statistics
-mathacademy-analyzer stats output.json
 ```
 
 ## Output Formats
@@ -46,35 +38,6 @@ mathacademy-analyzer stats output.json
 - **Static PNG**: Static image files suitable for documents and sharing
 - **Excel**: Structured data with course details and activity logs
 - **JSON**: Raw data for custom analysis
-
-## Generate All Command
-
-The `generate-all` command creates comprehensive analysis with all output formats:
-
-```bash
-mathacademy-analyzer generate-all activity_log.pdf -o analysis_results
-```
-
-**Generated files:**
-- `data.json` - Raw extracted data
-- `export.xlsx` - Excel with course details and activities
-- `comprehensive_dashboard.html` - Interactive web dashboard
-- `cumulative_xp.png` - Cumulative XP progress chart
-- `daily_xp.png` - Daily XP distribution chart
-- `task_types.png` - Task type distribution chart
-- `weekly_activity.png` - Weekly activity pattern chart
-- `efficiency.png` - Learning efficiency trend chart
-- `weekday_distribution.png` - Weekday learning pattern chart
-- `daily_xp_distribution.png` - Daily XP histogram chart
-- `weekly_daily_stats.png` - Weekly and daily statistics chart
-
-**Options:**
-- `--output-dir, -o` - Output directory (default: current directory)
-- `--name, -n` - Base name for generated files
-- `--static-only` - Generate only static charts
-- `--interactive-only` - Generate only interactive charts
-- `--data-only` - Generate only data files (Excel/JSON)
-- `--charts-only` - Generate only chart files
 
 ## More Useful Commands
 ```bash
