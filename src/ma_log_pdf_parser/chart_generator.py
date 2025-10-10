@@ -1489,6 +1489,27 @@ class ChartGenerator:
     
     def _generate_stats_summary_html(self, stats: dict) -> str:
         """Generate statistics summary HTML."""
+        longest_streak = stats.get('longest_streak', {})
+        current_streak = stats.get('current_streak', {})
+
+        # Format date ranges for display
+        def format_date_range(start_date, end_date):
+            if start_date and end_date:
+                start = pd.to_datetime(start_date).strftime('%m-%d')
+                end = pd.to_datetime(end_date).strftime('%m-%d')
+                return f"{start} to {end}"
+            return ""
+
+        longest_range = format_date_range(
+            longest_streak.get('start_date'),
+            longest_streak.get('end_date')
+        )
+
+        current_range = format_date_range(
+            current_streak.get('start_date'),
+            current_streak.get('end_date')
+        )
+
         return f"""
         <div class="chart-container">
             <div class="chart-title">Performance Summary</div>
@@ -1506,8 +1527,14 @@ class ChartGenerator:
                     <div class="stat-label">Active Days</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-value">{stats.get('max_daily_xp', 0):,}</div>
-                    <div class="stat-label">Best Day</div>
+                    <div class="stat-value">{longest_streak.get('length', 0)}</div>
+                    <div class="stat-label">Longest Streak</div>
+                    {f'<div style="font-size: 0.8em; opacity: 0.8; margin-top: 5px;">{longest_range}</div>' if longest_range else ''}
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{current_streak.get('length', 0)}</div>
+                    <div class="stat-label">Current Streak</div>
+                    {f'<div style="font-size: 0.8em; opacity: 0.8; margin-top: 5px;">{current_range}</div>' if current_range else ''}
                 </div>
             </div>
         </div>
@@ -1748,10 +1775,14 @@ class ChartGenerator:
         daily_df = self._calculate_daily_xp()
         cumulative_df = self._calculate_cumulative_xp()
         
+        longest_streak_data = self._calculate_longest_streak(daily_df)
+        current_streak_data = self._calculate_current_streak()
+
         stats = {
             'total_xp': int(cumulative_df['cumulative_xp'].max()) if not cumulative_df.empty else 0,
             'average_daily_xp': float(daily_df['xp_numeric'].mean()) if not daily_df.empty else 0,
-            'max_daily_xp': int(daily_df['xp_numeric'].max()) if not daily_df.empty else 0,
+            'longest_streak': longest_streak_data,
+            'current_streak': current_streak_data,
             'min_daily_xp': int(daily_df['xp_numeric'].min()) if not daily_df.empty else 0,
             'total_days': len(daily_df) if not daily_df.empty else 0,
             'active_days': int((daily_df['xp_numeric'] > 0).sum()) if not daily_df.empty else 0,
@@ -1764,21 +1795,125 @@ class ChartGenerator:
         
         return stats
     
+    def _calculate_longest_streak(self, daily_df: pd.DataFrame) -> Dict[str, Any]:
+        """Calculate the longest consecutive days with study activity.
+
+        Args:
+            daily_df: DataFrame containing daily XP data
+
+        Returns:
+            Dictionary containing streak length and date range
+        """
+        if self.df.empty:
+            return {'length': 0, 'start_date': None, 'end_date': None}
+
+        # Get the date range from the data
+        min_date = self.df['date'].min().date()
+        max_date = self.df['date'].max().date()
+
+        # Create a complete date range (all calendar days)
+        date_range = pd.date_range(start=min_date, end=max_date, freq='D')
+
+        # Count activities per day from the original data
+        daily_activity_count = self.df.groupby(self.df['date'].dt.date).size().reset_index()
+        daily_activity_count.columns = ['date', 'activity_count']
+        daily_activity_count['date'] = pd.to_datetime(daily_activity_count['date'])
+
+        # Create a dictionary for quick lookup of activity counts
+        activity_dict = dict(zip(daily_activity_count['date'].dt.date, daily_activity_count['activity_count']))
+
+        # Calculate consecutive streaks across all calendar days
+        max_streak = 0
+        current_streak = 0
+        current_streak_start = None
+        max_streak_start = None
+        max_streak_end = None
+
+        for date in date_range:
+            date_key = date.date()
+            has_activity = activity_dict.get(date_key, 0) > 0
+
+            if has_activity:
+                if current_streak == 0:
+                    current_streak_start = date_key
+                current_streak += 1
+
+                if current_streak > max_streak:
+                    max_streak = current_streak
+                    max_streak_start = current_streak_start
+                    max_streak_end = date_key
+            else:
+                current_streak = 0
+                current_streak_start = None
+
+        return {
+            'length': max_streak,
+            'start_date': max_streak_start.isoformat() if max_streak_start else None,
+            'end_date': max_streak_end.isoformat() if max_streak_end else None
+        }
+
+    def _calculate_current_streak(self) -> Dict[str, Any]:
+        """Calculate the current consecutive days with study activity ending on the last day of records.
+
+        Returns:
+            Dictionary containing current streak length and date range
+        """
+        if self.df.empty:
+            return {'length': 0, 'start_date': None, 'end_date': None}
+
+        # Get the date range from the data
+        min_date = self.df['date'].min().date()
+        max_date = self.df['date'].max().date()
+
+        # Create a complete date range (all calendar days)
+        date_range = pd.date_range(start=min_date, end=max_date, freq='D')
+
+        # Count activities per day from the original data
+        daily_activity_count = self.df.groupby(self.df['date'].dt.date).size().reset_index()
+        daily_activity_count.columns = ['date', 'activity_count']
+        daily_activity_count['date'] = pd.to_datetime(daily_activity_count['date'])
+
+        # Create a dictionary for quick lookup of activity counts
+        activity_dict = dict(zip(daily_activity_count['date'].dt.date, daily_activity_count['activity_count']))
+
+        # Calculate current streak by iterating backwards from the last day
+        current_streak = 0
+        current_streak_end = max_date  # The last day of records
+        current_streak_start = None
+
+        # Start from the last day and go backwards
+        for date in reversed(date_range):
+            date_key = date.date()
+            has_activity = activity_dict.get(date_key, 0) > 0
+
+            if has_activity:
+                current_streak += 1
+                current_streak_start = date_key
+            else:
+                # Stop as soon as we hit a day without activity
+                break
+
+        return {
+            'length': current_streak,
+            'start_date': current_streak_start.isoformat() if current_streak_start else None,
+            'end_date': current_streak_end.isoformat() if current_streak_end else None
+        }
+
     def _calculate_recent_trend(self, daily_df: pd.DataFrame) -> Dict[str, float]:
         """Calculate recent XP trend (last 7 days vs previous 7 days)."""
         if len(daily_df) < 14:
             return {'change_percent': 0.0, 'direction': 'insufficient_data'}
-        
+
         recent_7_days = daily_df.tail(7)['xp_numeric'].mean()
         previous_7_days = daily_df.iloc[-14:-7]['xp_numeric'].mean()
-        
+
         if previous_7_days == 0:
             change_percent = 100.0 if recent_7_days > 0 else 0.0
         else:
             change_percent = ((recent_7_days - previous_7_days) / previous_7_days) * 100
-        
+
         direction = 'increasing' if change_percent > 0 else 'decreasing' if change_percent < 0 else 'stable'
-        
+
         return {
             'change_percent': float(change_percent),
             'direction': direction,
