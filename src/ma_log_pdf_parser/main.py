@@ -9,7 +9,12 @@ from . import __version__
 
 @click.group()
 def cli():
-    """PDF parsing tools using pdfplumber."""
+    """Math Academy Log Analyzer - Complete PDF analysis toolkit.
+
+    This tool analyzes Math Academy activity log PDFs and generates comprehensive
+    reports including Excel spreadsheets, JSON data, interactive charts, and
+    static visualizations.
+    """
     pass
 
 
@@ -321,6 +326,206 @@ def chart(json_path, output, static, dashboard, chart_type):
         
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
+
+
+@cli.command()
+@click.argument("pdf_path", type=click.Path(exists=True))
+@click.option("--output-dir", "-o", type=click.Path(), help="Output directory for all generated files")
+@click.option("--name", "-n", help="Base name for generated files (defaults to PDF filename)")
+@click.option("--static-only", is_flag=True, help="Generate only static PNG charts (no interactive HTML)")
+@click.option("--interactive-only", is_flag=True, help="Generate only interactive HTML charts (no static PNG)")
+@click.option("--data-only", is_flag=True, help="Generate only data files (Excel and JSON, no charts)")
+@click.option("--charts-only", is_flag=True, help="Generate only chart files (no Excel or JSON)")
+def generate_all(pdf_path, output_dir, name, static_only, interactive_only, data_only, charts_only):
+    """Generate all output formats from PDF in one command.
+
+    This command processes a Math Academy activity log PDF and generates:
+    - Excel file (.xlsx) with course progress data
+    - JSON file with parsed data for chart generation
+    - Interactive HTML charts (for web viewing)
+    - Static PNG charts (for reports/documents)
+
+    By default, generates all formats. Use options to control output types.
+    """
+    try:
+        import time
+        start_time = time.time()
+
+        # Setup paths
+        pdf_path_obj = Path(pdf_path)
+        if output_dir:
+            output_path = Path(output_dir)
+        else:
+            output_path = pdf_path_obj.parent
+
+        # Create output directory if it doesn't exist
+        output_path.mkdir(exist_ok=True)
+
+        # Determine base filename
+        if name:
+            base_name = name
+        else:
+            base_name = pdf_path_obj.stem
+
+        click.echo(f"Processing PDF: {pdf_path}")
+        click.echo(f"Output directory: {output_path}")
+        click.echo(f"Base filename: {base_name}")
+        click.echo()
+
+        # Determine what to generate
+        generate_data = not charts_only
+        generate_charts = not data_only
+        generate_interactive = not static_only
+        generate_static = not interactive_only
+
+        generated_files = []
+
+        # Step 1: Parse course data from PDF
+        if generate_data or generate_charts:
+            click.echo("Step 1: Parsing course data from PDF...")
+            parser_instance = CourseProgressParser(pdf_path)
+            data = parser_instance.parse_course_data()
+
+            if not data:
+                click.echo("No course data found in PDF. Cannot proceed.", err=True)
+                return
+
+            click.echo(f"  ✓ Parsed {len(data)} activity records")
+
+        # Step 2: Generate data files (Excel and JSON)
+        if generate_data:
+            click.echo("Step 2: Generating data files...")
+
+            # Generate Excel file
+            excel_path = output_path / f"{base_name}.xlsx"
+            parser_instance.export_to_excel(str(excel_path), data)
+            generated_files.append(f"Excel: {excel_path}")
+            click.echo(f"  ✓ Excel file: {excel_path}")
+
+            # Generate JSON file
+            json_path = output_path / f"{base_name}.json"
+            parser_instance.export_to_json(str(json_path), data)
+            generated_files.append(f"JSON: {json_path}")
+            click.echo(f"  ✓ JSON file: {json_path}")
+
+        # Step 3: Generate charts
+        if generate_charts:
+            click.echo("Step 3: Generating charts...")
+
+            # Use JSON file for chart generation
+            json_file_path = output_path / f"{base_name}.json" if generate_data else None
+            if not json_file_path or not json_file_path.exists():
+                # If JSON wasn't generated in step 2, create temporary JSON
+                json_file_path = output_path / f"{base_name}_temp.json"
+                parser_instance.export_to_json(str(json_file_path), data)
+                generated_files.append(f"Temporary JSON: {json_file_path}")
+
+            chart_gen = ChartGenerator(str(json_file_path))
+
+            # Create charts subdirectory
+            charts_dir = output_path / "charts"
+            charts_dir.mkdir(exist_ok=True)
+
+            # Generate interactive charts
+            if generate_interactive:
+                click.echo("  Generating interactive HTML charts...")
+
+                # Comprehensive dashboard
+                dashboard_path = chart_gen.generate_comprehensive_dashboard(
+                    str(charts_dir / f"{base_name}_dashboard")
+                )
+                generated_files.append(f"Interactive Dashboard: {dashboard_path}")
+
+                # Individual charts
+                cumulative_path = chart_gen.generate_cumulative_xp_chart(
+                    str(charts_dir / f"{base_name}_cumulative_xp"),
+                    interactive=True
+                )
+                generated_files.append(f"Interactive Cumulative XP: {cumulative_path}")
+
+                daily_path = chart_gen.generate_daily_xp_chart(
+                    str(charts_dir / f"{base_name}_daily_xp"),
+                    interactive=True
+                )
+                generated_files.append(f"Interactive Daily XP: {daily_path}")
+
+                task_type_path = chart_gen.generate_task_type_pie_chart(
+                    str(charts_dir / f"{base_name}_task_type"),
+                    interactive=True
+                )
+                generated_files.append(f"Interactive Task Type: {task_type_path}")
+
+                click.echo(f"    ✓ Generated interactive charts in {charts_dir}")
+
+            # Generate static charts
+            if generate_static:
+                click.echo("  Generating static PNG charts...")
+
+                # Comprehensive dashboard
+                static_dashboard_path = chart_gen.generate_comprehensive_dashboard(
+                    str(charts_dir / f"{base_name}_dashboard_static")
+                )
+                generated_files.append(f"Static Dashboard: {static_dashboard_path}")
+
+                # Individual charts
+                static_cumulative_path = chart_gen.generate_cumulative_xp_chart(
+                    str(charts_dir / f"{base_name}_cumulative_xp_static"),
+                    interactive=False
+                )
+                generated_files.append(f"Static Cumulative XP: {static_cumulative_path}")
+
+                static_daily_path = chart_gen.generate_daily_xp_chart(
+                    str(charts_dir / f"{base_name}_daily_xp_static"),
+                    interactive=False
+                )
+                generated_files.append(f"Static Daily XP: {static_daily_path}")
+
+                static_task_type_path = chart_gen.generate_task_type_pie_chart(
+                    str(charts_dir / f"{base_name}_task_type_static"),
+                    interactive=False
+                )
+                generated_files.append(f"Static Task Type: {static_task_type_path}")
+
+                click.echo(f"    ✓ Generated static charts in {charts_dir}")
+
+            # Clean up temporary JSON if created
+            if not generate_data and json_file_path.name.endswith("_temp.json") and json_file_path.exists():
+                json_file_path.unlink()
+                generated_files = [f for f in generated_files if "Temporary JSON" not in f]
+
+        # Calculate processing time
+        end_time = time.time()
+        processing_time = end_time - start_time
+
+        # Summary
+        click.echo()
+        click.echo("=" * 60)
+        click.echo("GENERATION COMPLETE")
+        click.echo("=" * 60)
+        click.echo(f"Processing time: {processing_time:.1f} seconds")
+        click.echo(f"Total files generated: {len(generated_files)}")
+        click.echo()
+        click.echo("Generated files:")
+        for file_info in generated_files:
+            click.echo(f"  • {file_info}")
+
+        # Show statistics
+        if generate_data or generate_charts:
+            stats = chart_gen.get_xp_statistics() if generate_charts else None
+            if stats:
+                click.echo()
+                click.echo("XP Statistics:")
+                click.echo(f"  Total XP: {stats['total_xp']:,}")
+                click.echo(f"  Average Daily XP: {stats['average_daily_xp']:.1f}")
+                click.echo(f"  Active Days: {stats['active_days']}/{stats['total_days']}")
+
+        click.echo()
+        click.echo(f"All files saved to: {output_path}")
+
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        import traceback
+        click.echo(f"Debug info: {traceback.format_exc()}", err=True)
 
 
 @cli.command()
