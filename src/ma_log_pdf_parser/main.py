@@ -218,7 +218,7 @@ def export(pdf_path, output_path, json_only, excel_only):
 @click.option("--output", "-o", type=click.Path(), help="Output directory for chart files")
 @click.option("--static", is_flag=True, help="Generate static PNG charts instead of interactive HTML")
 @click.option("--dashboard", is_flag=True, help="Generate combined dashboard")
-@click.option("--chart-type", type=click.Choice(['all', 'xp', 'task-type', 'weekly-daily', 'efficiency', 'weekday', 'daily-dist', 'dashboard']), 
+@click.option("--chart-type", type=click.Choice(['all', 'xp', 'task-type', 'weekly-daily', 'efficiency', 'weekday', 'daily-dist', 'dashboard']),
               default='all', help="Specify chart type to generate")
 def chart(json_path, output, static, dashboard, chart_type):
     """Generate charts from learning progress JSON data.
@@ -317,7 +317,7 @@ def chart(json_path, output, static, dashboard, chart_type):
                 str(output_dir / "comprehensive_dashboard")
             )
             generated_charts.append(f"Comprehensive dashboard: {dashboard_path}")
-        
+
         # Display generated charts
         if generated_charts:
             click.echo(f"\nGenerated charts:")
@@ -485,12 +485,6 @@ def generate_all(pdf_path, output_dir, name, static_only, interactive_only, data
             # Generate static charts
             if generate_static:
                 click.echo("  Generating static PNG charts...")
-
-                # Comprehensive dashboard
-                static_dashboard_path = chart_gen.generate_comprehensive_dashboard(
-                    str(charts_dir / f"{base_name}_dashboard_static")
-                )
-                generated_files.append(f"Static Dashboard: {static_dashboard_path}")
 
                 # Individual charts
                 static_cumulative_path = chart_gen.generate_cumulative_xp_chart(

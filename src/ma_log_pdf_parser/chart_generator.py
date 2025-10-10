@@ -2604,3 +2604,5 @@ class ChartGenerator:
                 '3': '#30a14e'   # Dark green - XP >= 30
             }
         }
+
+    
