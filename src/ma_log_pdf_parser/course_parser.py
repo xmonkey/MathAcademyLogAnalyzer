@@ -62,9 +62,9 @@ class CourseProgressParser:
             regular_match = re.search(regular_task_pattern, line)
             if regular_match and current_date:
                 course_full, task_type, description, earned, possible = regular_match.groups()
-                
-                # Extract course name
-                course = self._extract_course_name(course_full)
+
+                # Use course name directly from PDF (already properly formatted)
+                course = course_full
                 
                 # Use task_type directly for Task
                 task_name = task_type.capitalize()
@@ -85,9 +85,9 @@ class CourseProgressParser:
             placement_match = re.search(placement_task_pattern, line)
             if placement_match and current_date:
                 course_full, task_type, earned = placement_match.groups()
-                
-                # Extract course name
-                course = self._extract_course_name(course_full)
+
+                # Use course name directly from PDF (already properly formatted)
+                course = course_full
                 
                 # For placement tasks, the XP possible is the same as earned (no slash)
                 xp_earned = int(earned)
@@ -354,14 +354,4 @@ class CourseProgressParser:
         }
         return month_map.get(month, '01')
 
-    def _extract_course_name(self, full_name: str) -> str:
-        """Extract clean course name from full name."""
-        # Keep the full name but clean it up
-        course_name = full_name.strip()
-        
-        # Don't remove grade level prefixes - keep "4th Grade Math" format
-        
-        # Capitalize properly
-        course_name = course_name.title()
-        
-        return course_name
+    
