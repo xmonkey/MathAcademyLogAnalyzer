@@ -19,11 +19,12 @@ pip install -e .
 ```
 
 ### 2. 下载活动日志 PDF
-1. 使用家长账户登录 [mathacademy.com](https://mathacademy.com)
-2. 点击学生设置图标 (⚙️) → "Documentation"
-3. 在 "Activity Log" 下点击 "Request..."
-4. 设置时间范围（建议：从第一天学习开始）
-5. 点击 "Preview" → 下载 PDF
+1. 使用家长/监督员账户登录 [mathacademy.com](https://mathacademy.com)
+2. 点击学生姓名旁的设置图标 (⚙️)
+3. 从菜单中选择 "Documentation"
+4. 在 "Activity Log" 下点击 "Request..."
+5. **重要**：设置时间范围以包含您的整个学习期间（建议：从第一天开始）
+6. 点击 "Preview" → 下载 PDF 文件
 
 ### 3. 分析并生成图表
 ```bash

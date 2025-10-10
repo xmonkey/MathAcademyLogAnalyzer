@@ -22,11 +22,12 @@ pip install -e .
 ```
 
 ### 2. Download Activity Log PDF
-1. Log in to [mathacademy.com](https://mathacademy.com) with parent account
-2. Click student's settings icon (⚙️) → "Documentation"
-3. Under "Activity Log", click "Request..."
-4. Set time frame (recommended: from first day of learning)
-5. Click "Preview" → Download PDF
+1. Log in to [mathacademy.com](https://mathacademy.com) with your parent/supervisor account
+2. Click the student's settings icon (⚙️) next to their name
+3. Select "Documentation" from the menu
+4. Under "Activity Log", click "Request..."
+5. **Important**: Set time frame to include your entire learning period (recommended: from first day)
+6. Click "Preview" → Download the PDF file
 
 ### 3. Analyze
 ```bash
@@ -52,7 +53,7 @@ mathacademy-analyzer tables activity_log.pdf
 mathacademy-analyzer search activity_log.pdf "search term"
 
 # Generate specific chart types
-mathacademy-analyzer chart data.json --chart-type cumulative_xp
+mathacademy-analyzer chart data.json --chart-type xp
 mathacademy-analyzer chart data.json --chart-type dashboard
 ```
 
@@ -80,7 +81,7 @@ pip install -e .
 **Command not found?**
 ```bash
 # Remove old version first
-pip uninstall ma-log-pdf-parser -y
+pip uninstall MathAcademyLogAnalyzer -y
 
 # Reinstall
 python3 -m pip install -e .
