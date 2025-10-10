@@ -786,21 +786,54 @@ class ChartGenerator:
     def _generate_static_task_type_pie(self, df: pd.DataFrame, output_path: str) -> str:
         """Generate static task type pie chart using Matplotlib."""
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
-        
-        # Task count pie chart
-        ax1.pie(df['Count'], labels=df['Task Type'], autopct='%1.1f%%', startangle=90)
+
+        # Custom autopct function to hide percentages for items under 5%
+        def autopct_filter(pct):
+            return ('%1.1f%%' % pct) if pct >= 5.0 else ''
+
+        # Create custom labels: hide labels for items under 3%, show for others
+        def create_labels(data, percentages):
+            labels = []
+            for i, pct in enumerate(percentages):
+                if pct >= 3.0:
+                    labels.append(data.iloc[i])
+                else:
+                    labels.append('')
+            return labels
+
+        # Calculate percentages for label filtering
+        count_percentages = (df['Count'] / df['Count'].sum() * 100).values
+        xp_percentages = (df['Total XP'] / df['Total XP'].sum() * 100).values
+
+        # Create filtered labels
+        count_labels = create_labels(df['Task Type'], count_percentages)
+        xp_labels = create_labels(df['Task Type'], xp_percentages)
+
+        # Task count pie chart (no individual legend)
+        ax1.pie(df['Count'], labels=count_labels, autopct=autopct_filter, startangle=90)
         ax1.set_title('Task Count Distribution')
-        
-        # XP distribution pie chart
-        ax2.pie(df['Total XP'], labels=df['Task Type'], autopct='%1.1f%%', startangle=90)
+
+        # XP distribution pie chart (no individual legend)
+        ax2.pie(df['Total XP'], labels=xp_labels, autopct=autopct_filter, startangle=90)
         ax2.set_title('XP Distribution')
         
+        # Create a shared legend at the bottom
+        # Create proxy artists for legend
+        from matplotlib.patches import Patch
+        legend_elements = [Patch(facecolor=plt.cm.tab10(i), label=task_type)
+                          for i, task_type in enumerate(df['Task Type'])]
+
+        # Add legend at the bottom center
+        fig.legend(handles=legend_elements, title="Task Types",
+                   loc='lower center', bbox_to_anchor=(0.5, -0.05), ncol=len(df['Task Type']))
+
         # Main title
         fig.suptitle("Task Type Distribution",
                     fontsize=16, fontweight='bold')
-        
-        # Adjust layout
+
+        # Adjust layout to make room for bottom legend
         plt.tight_layout()
+        plt.subplots_adjust(bottom=0.15)  # Make room for legend at bottom
         
         # Save as PNG
         output_file = f"{output_path}.png"
