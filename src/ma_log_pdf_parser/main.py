@@ -217,17 +217,13 @@ def export(pdf_path, output_path, json_only, excel_only):
               default='all', help="Specify chart type to generate")
 def chart(json_path, output, static, dashboard, chart_type):
     """Generate charts from learning progress JSON data.
-    
-    Generates various charts from the exported JSON data:
-    - XP charts (cumulative and daily trends)
-    - Task type distribution pie chart
-    - Weekly/daily XP statistics
-    - Learning efficiency trend chart
-    - Average Daily XP by weekday chart
-    - Daily XP distribution chart (histogram)
-    - Comprehensive dashboard (all charts in one page)
-    
-    By default, generates all charts. Use --chart-type to specify specific charts.
+
+    Chart types: XP charts (cumulative and daily trends), task type distribution
+    (dual pie charts: task count and XP), weekly/daily XP statistics, learning
+    efficiency trend, average daily XP by weekday, daily XP distribution
+    (histogram), and comprehensive dashboard.
+
+    By default, generates all charts. Use --chart-type for specific charts.
     Use --static for PNG images instead of interactive HTML.
     """
     try:

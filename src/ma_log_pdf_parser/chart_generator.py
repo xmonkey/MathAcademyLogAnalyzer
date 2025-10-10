@@ -1262,8 +1262,13 @@ class ChartGenerator:
     
     def _generate_task_type_chart_html(self, data: pd.DataFrame) -> str:
         """Generate task type distribution chart HTML."""
-        fig = go.Figure()
-        
+        # Create subplots for two pie charts
+        fig = make_subplots(
+            rows=1, cols=2,
+            subplot_titles=('Task Count Distribution', 'XP Distribution'),
+            specs=[[{"type": "pie"}, {"type": "pie"}]]
+        )
+
         # Task count pie chart
         fig.add_trace(go.Pie(
             labels=data['Task Type'],
@@ -1273,23 +1278,36 @@ class ChartGenerator:
             textinfo='label+percent',
             textposition='inside',
             showlegend=False
-        ))
-        
+        ), row=1, col=1)
+
+        # XP distribution pie chart
+        fig.add_trace(go.Pie(
+            labels=data['Task Type'],
+            values=data['Total XP'],
+            name="XP Distribution",
+            hovertemplate="<b>%{label}</b><br>Total XP: %{value}<br>Percentage: %{text}%<extra></extra>",
+            textinfo='label+percent',
+            textposition='inside',
+            showlegend=False
+        ), row=1, col=2)
+
         fig.update_layout(
             title="Task Type Distribution",
             template='plotly_white',
             height=400,
-            showlegend=False
+            showlegend=True
         )
-        
+
         chart_id = 'task_type_chart'
         chart_html = f'<div id="{chart_id}" style="height: 400px;"></div>'
         chart_js = f'Plotly.newPlot("{chart_id}", {fig.to_json()}, {{responsive: true}});'
-        
+
         return f"""
         <div class="chart-container">
             <div class="chart-title">Task Type Distribution</div>
-            {chart_html}
+            <div class="two-column">
+                {chart_html}
+            </div>
             <script>{chart_js}</script>
         </div>
         """
@@ -1322,7 +1340,9 @@ class ChartGenerator:
         return f"""
         <div class="chart-container">
             <div class="chart-title">Average Daily XP by Weekday</div>
-            {chart_html}
+            <div class="two-column">
+                {chart_html}
+            </div>
             <script>{chart_js}</script>
         </div>
         """
@@ -1355,7 +1375,9 @@ class ChartGenerator:
         return f"""
         <div class="chart-container">
             <div class="chart-title">Daily XP Distribution</div>
-            {chart_html}
+            <div class="two-column">
+                {chart_html}
+            </div>
             <script>{chart_js}</script>
         </div>
         """
@@ -1404,7 +1426,9 @@ class ChartGenerator:
         return f"""
         <div class="chart-container">
             <div class="chart-title">XP Trends</div>
-            {chart_html}
+            <div class="two-column">
+                {chart_html}
+            </div>
             <script>{chart_js}</script>
         </div>
         """
@@ -1452,7 +1476,9 @@ class ChartGenerator:
         return f"""
         <div class="chart-container">
             <div class="chart-title">Learning Efficiency Trend</div>
-            {chart_html}
+            <div class="two-column">
+                {chart_html}
+            </div>
             <script>{chart_js}</script>
         </div>
         """
@@ -1619,10 +1645,10 @@ class ChartGenerator:
 
         return weekday_stats
     
-    def _calculate_daily_xp_distribution(self) -> pd.DataFrame:
+    def _calculate_daily_xp_distribution(self) -> Tuple[pd.DataFrame, Dict[str, Any]]:
         """Calculate daily XP distribution (histogram of daily XP counts)."""
         if self.df.empty:
-            return pd.DataFrame()
+            return pd.DataFrame(), {}
 
         # Calculate daily XP totals
         daily_xp = self.df.groupby('date')['xp_numeric'].sum().reset_index()
@@ -1649,14 +1675,8 @@ class ChartGenerator:
 
             left, right = range_obj.left, range_obj.right
 
-            # Handle negative values
-            if right < 0:
-                return f"{int(left)} to {int(right)}"
-            elif left < 0:
-                return f"{int(left)} to {int(right)}"
-            else:
-                # For non-negative values, use integer format
-                return f"{int(left)}-{int(right)}"
+            # Always use consistent format with dash
+            return f"{int(left)}-{int(right)}"
 
         distribution['Range Label'] = distribution['XP Range'].apply(format_range_label)
 
