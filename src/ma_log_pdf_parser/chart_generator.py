@@ -380,8 +380,8 @@ class ChartGenerator:
             for segment, course in segments:
                 color = colors.get(course, colors['Unknown'])
 
-                # Create custom hover text for each data point
-                hover_text = [f'<b>{date.strftime("%Y-%m-%d")}</b><br>Cumulative XP: {cum_xp}<br>Daily XP: {daily_xp}<br>Main Course: {course}'
+                # Create custom hover text for each data point (date shown by x unified mode)
+                hover_text = [f'Cumulative XP: {cum_xp}<br>Daily XP: {daily_xp}<br>Main Course: {course}'
                               for date, cum_xp, daily_xp in zip(segment['date'], segment['cumulative_xp'], segment['xp_numeric'])]
 
                 fig.add_trace(go.Scatter(
@@ -411,7 +411,7 @@ class ChartGenerator:
             title="Cumulative XP Progress",
             xaxis_title="Date",
             yaxis_title="Cumulative XP",
-            hovermode='closest',
+            hovermode='x unified',
             template='plotly_white',
             showlegend=True,
             height=650,  # Increased height to accommodate legend
@@ -425,8 +425,8 @@ class ChartGenerator:
                 orientation="v",
                 yanchor="top",
                 y=0.99,
-                xanchor="right",
-                x=0.99,
+                xanchor="left",
+                x=0.01,
                 bgcolor="rgba(255,255,255,0.9)",
                 bordercolor="#CCCCCC",
                 borderwidth=1,
@@ -539,14 +539,14 @@ class ChartGenerator:
                 legend_elements.append(plt.Line2D([0], [0], color=color, linewidth=3, label=label_name))
 
         if legend_elements:
-            # Place legend inside the plot area in the upper right
-            plt.legend(handles=legend_elements, loc='upper right', framealpha=0.95,
+            # Place legend inside the plot area in the upper left
+            plt.legend(handles=legend_elements, loc='upper left', framealpha=0.95,
                       fancybox=True, shadow=True, fontsize=9)
 
         # Adjust layout to make room for data
         plt.tight_layout()
-        # Adjust right margin slightly to accommodate legend
-        plt.subplots_adjust(right=0.9)
+        # Adjust left margin slightly to accommodate legend
+        plt.subplots_adjust(left=0.15)
 
         # Save as PNG
         output_file = f"{output_path}.png"
@@ -781,14 +781,14 @@ class ChartGenerator:
         legend_elements.append(plt.Line2D([0], [0], color='#F18F01', linewidth=2, label='7-Day Average'))
 
         if legend_elements:
-            # Place legend inside the plot area in the upper right
-            plt.legend(handles=legend_elements, loc='upper right', framealpha=0.95,
+            # Place legend inside the plot area in the upper left
+            plt.legend(handles=legend_elements, loc='upper left', framealpha=0.95,
                       fancybox=True, shadow=True, fontsize=9)
 
         # Adjust layout to make room for data
         plt.tight_layout()
-        # Adjust right margin slightly to accommodate legend
-        plt.subplots_adjust(right=0.9)
+        # Adjust left margin slightly to accommodate legend
+        plt.subplots_adjust(left=0.15)
 
         # Save as PNG
         output_file = f"{output_path}.png"
