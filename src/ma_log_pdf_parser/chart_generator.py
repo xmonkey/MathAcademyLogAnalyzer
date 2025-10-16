@@ -360,14 +360,29 @@ class ChartGenerator:
         # Create segments for different colors
         if not colored_df.empty:
             # Split the data into segments where the dominant course changes
-            segments = self._create_course_segments(colored_df, colors)
+            segments = []
+            current_course = colored_df.iloc[0]['dominant_course']
+            start_idx = 0
+
+            for i in range(1, len(colored_df)):
+                if colored_df.iloc[i]['dominant_course'] != current_course:
+                    # Create a segment from start_idx to i-1
+                    segment = colored_df.iloc[start_idx:i]
+                    segments.append((segment, current_course))
+                    current_course = colored_df.iloc[i]['dominant_course']
+                    start_idx = i
+
+            # Add the last segment
+            segment = colored_df.iloc[start_idx:]
+            segments.append((segment, current_course))
 
             # Add each segment as a separate trace
             for segment, course in segments:
                 color = colors.get(course, colors['Unknown'])
 
                 # Create custom hover text for each data point (date shown by x unified mode)
-                hover_text = self._create_cumulative_hover_text(segment, course)
+                hover_text = [f'Cumulative XP: {cum_xp}<br>Daily XP: {daily_xp}<br>Main Course: {course}'
+                              for date, cum_xp, daily_xp in zip(segment['date'], segment['cumulative_xp'], segment['xp_numeric'])]
 
                 fig.add_trace(go.Scatter(
                     x=segment['date'],
@@ -578,13 +593,28 @@ class ChartGenerator:
         # Create segments for different colors
         if not colored_df.empty:
             # Split the data into segments where the dominant course changes
-            segments = self._create_course_segments(colored_df, colors)
+            segments = []
+            current_course = colored_df.iloc[0]['dominant_course']
+            start_idx = 0
+            for i in range(1, len(colored_df)):
+                if colored_df.iloc[i]['dominant_course'] != current_course:
+                    # Create a segment from start_idx to i-1
+                    segment = colored_df.iloc[start_idx:i]
+                    segments.append((segment, current_course))
+                    current_course = colored_df.iloc[i]['dominant_course']
+                    start_idx = i
+            # Add the last segment
+            segment = colored_df.iloc[start_idx:]
+            segments.append((segment, current_course))
 
             # Add each segment as a separate trace
-            for segment, course in segments:
-                color = colors.get(course, colors['Unknown'])
-                # Create custom hover text for each data point
-                hover_text = self._create_daily_hover_text(segment, course)
+        for segment, course in segments:
+            color = colors.get(course, colors['Unknown'])
+            # Create custom hover text for each data point
+            hover_text = []
+            for date, daily_xp in zip(segment['date'], segment['xp_numeric']):
+                hover_info = f'Main Course: {course}<br>Daily XP: {daily_xp}'
+                hover_text.append(hover_info)
 
             fig.add_trace(go.Bar(
                 x=segment['date'],
@@ -2788,58 +2818,4 @@ class ChartGenerator:
             }
         }
 
-    def _create_course_segments(self, colored_df: pd.DataFrame, colors: Dict[str, str]) -> List[Tuple[pd.DataFrame, str]]:
-        """Create course segments by splitting data where dominant course changes.
-
-        Args:
-            colored_df: DataFrame with dominant course information
-            colors: Mapping of course names to colors
-
-        Returns:
-            List of tuples: (segment_data, course_name)
-        """
-        segments = []
-        current_course = colored_df.iloc[0]['dominant_course']
-        start_idx = 0
-
-        for i in range(1, len(colored_df)):
-            if colored_df.iloc[i]['dominant_course'] != current_course:
-                # Create a segment from start_idx to i-1
-                segment = colored_df.iloc[start_idx:i]
-                segments.append((segment, current_course))
-                current_course = colored_df.iloc[i]['dominant_course']
-                start_idx = i
-
-        # Add the last segment
-        segment = colored_df.iloc[start_idx:]
-        segments.append((segment, current_course))
-
-        return segments
-
-    def _create_cumulative_hover_text(self, segment: pd.DataFrame, course: str) -> List[str]:
-        """Create hover text for cumulative XP segments.
-
-        Args:
-            segment: DataFrame segment with date, cumulative_xp, xp_numeric columns
-            course: Course name for the segment
-
-        Returns:
-            List of hover text strings
-        """
-        return [f'Cumulative XP: {cum_xp}<br>Daily XP: {daily_xp}<br>Main Course: {course}'
-                for cum_xp, daily_xp in zip(segment['cumulative_xp'], segment['xp_numeric'])]
-
-    def _create_daily_hover_text(self, segment: pd.DataFrame, course: str) -> List[str]:
-        """Create hover text for daily XP segments.
-
-        Args:
-            segment: DataFrame segment with date, xp_numeric columns
-            course: Course name for the segment
-
-        Returns:
-            List of hover text strings
-        """
-        return [f'Main Course: {course}<br>Daily XP: {daily_xp}'
-                for daily_xp in segment['xp_numeric']]
-
-
+    
