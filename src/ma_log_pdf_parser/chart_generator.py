@@ -267,14 +267,25 @@ class ChartGenerator:
         return course_cumulative_xp
 
     def _calculate_daily_xp(self) -> pd.DataFrame:
-        """Calculate daily XP with date range coverage."""
+        """Calculate daily XP with complete calendar date coverage."""
         if self.df.empty:
             return pd.DataFrame()
-        
+
         # Group by date and sum XP
         daily_xp = self.df.groupby('date')['xp_numeric'].sum().reset_index()
-        
-        # Simplified approach - don't fill missing dates for now
+
+        # Create complete date range from min to max date
+        min_date = daily_xp['date'].min()
+        max_date = daily_xp['date'].max()
+        all_dates = pd.date_range(start=min_date, end=max_date, freq='D')
+
+        # Create complete dataframe with all calendar dates
+        complete_df = pd.DataFrame({'date': all_dates})
+
+        # Merge with actual data (missing dates get 0 XP)
+        daily_xp = complete_df.merge(daily_xp, on='date', how='left')
+        daily_xp['xp_numeric'] = daily_xp['xp_numeric'].fillna(0)
+
         return daily_xp
     
     def generate_cumulative_xp_chart(self, output_path: Optional[str] = None, 
@@ -543,7 +554,7 @@ class ChartGenerator:
         
         # Add trend line (7-day moving average)
         if len(df) >= 7:
-            df['trend'] = df['xp_numeric'].rolling(window=7, center=True).mean()
+            df['trend'] = df['xp_numeric'].rolling(window=7, center=False).mean()
             fig.add_trace(go.Scatter(
                 x=df['date'],
                 y=df['trend'],
@@ -591,7 +602,7 @@ class ChartGenerator:
         
         # Add trend line (7-day moving average)
         if len(df) >= 7:
-            df['trend'] = df['xp_numeric'].rolling(window=7, center=True).mean()
+            df['trend'] = df['xp_numeric'].rolling(window=7, center=False).mean()
             plt.plot(df['date'], df['trend'], 
                     color='#F18F01', linewidth=2, 
                     label='7-Day Average')
@@ -681,7 +692,7 @@ class ChartGenerator:
         
         # Add 7-day trend line to daily chart
         if len(daily_df) >= 7:
-            daily_df['trend'] = daily_df['xp_numeric'].rolling(window=7, center=True).mean()
+            daily_df['trend'] = daily_df['xp_numeric'].rolling(window=7, center=False).mean()
             fig.add_trace(
                 go.Scatter(
                     x=daily_df['date'],
