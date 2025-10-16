@@ -287,7 +287,40 @@ class ChartGenerator:
         daily_xp['xp_numeric'] = daily_xp['xp_numeric'].fillna(0)
 
         return daily_xp
-    
+
+    def _calculate_daily_xp_with_dominant_course(self) -> pd.DataFrame:
+        """Calculate daily XP with dominant course color for each day."""
+        if self.df.empty:
+            return pd.DataFrame()
+
+        # Group by date and course, sum XP
+        daily_course_xp = self.df.groupby(['date', 'Course'])['xp_numeric'].sum().reset_index()
+
+        # Find the dominant course for each day (course with most XP)
+        dominant_course = daily_course_xp.loc[daily_course_xp.groupby('date')['xp_numeric'].idxmax()]
+        dominant_course = dominant_course.rename(columns={'Course': 'dominant_course'})
+
+        # Calculate daily total XP
+        daily_total = self.df.groupby('date')['xp_numeric'].sum().reset_index()
+
+        # Merge with dominant course info
+        daily_data = pd.merge(daily_total, dominant_course[['date', 'dominant_course']], on='date', how='left')
+
+        # Create complete date range from min to max date
+        min_date = daily_data['date'].min()
+        max_date = daily_data['date'].max()
+        all_dates = pd.date_range(start=min_date, end=max_date, freq='D')
+
+        # Create complete dataframe with all calendar dates
+        complete_df = pd.DataFrame({'date': all_dates})
+
+        # Merge with actual data (missing dates get 0 XP and Unknown course)
+        daily_data = complete_df.merge(daily_data, on='date', how='left')
+        daily_data['xp_numeric'] = daily_data['xp_numeric'].fillna(0)
+        daily_data['dominant_course'] = daily_data['dominant_course'].fillna('Unknown')
+
+        return daily_data
+
     def generate_cumulative_xp_chart(self, output_path: Optional[str] = None, 
                                    interactive: bool = True) -> str:
         """Generate cumulative XP chart.
@@ -381,18 +414,23 @@ class ChartGenerator:
             hovermode='closest',
             template='plotly_white',
             showlegend=True,
-            height=600,
+            height=650,  # Increased height to accommodate legend
+            margin=dict(t=100, b=50, l=50, r=50),  # Add more top margin for legend
             xaxis=dict(
                 tickformat='%Y-%m-%d',
                 tickangle=45
             ),
             legend=dict(
                 title="Course",
-                orientation="h",
-                yanchor="bottom",
-                y=1.02,
+                orientation="v",
+                yanchor="top",
+                y=0.99,
                 xanchor="right",
-                x=1
+                x=0.99,
+                bgcolor="rgba(255,255,255,0.9)",
+                bordercolor="#CCCCCC",
+                borderwidth=1,
+                tracegroupgap=5
             )
         )
 
@@ -501,11 +539,14 @@ class ChartGenerator:
                 legend_elements.append(plt.Line2D([0], [0], color=color, linewidth=3, label=label_name))
 
         if legend_elements:
-            plt.legend(handles=legend_elements, loc='upper left', framealpha=0.95,
-                      bbox_to_anchor=(0.02, 0.98), fancybox=True, shadow=True)
+            # Place legend inside the plot area in the upper right
+            plt.legend(handles=legend_elements, loc='upper right', framealpha=0.95,
+                      fancybox=True, shadow=True, fontsize=9)
 
-        # Adjust layout to make room for legend
+        # Adjust layout to make room for data
         plt.tight_layout()
+        # Adjust right margin slightly to accommodate legend
+        plt.subplots_adjust(right=0.9)
 
         # Save as PNG
         output_file = f"{output_path}.png"
@@ -539,20 +580,54 @@ class ChartGenerator:
             return self._generate_static_daily_xp(daily_df, output_path)
     
     def _generate_interactive_daily_xp(self, df: pd.DataFrame, output_path: str) -> str:
-        """Generate interactive daily XP chart using Plotly."""
+        """Generate interactive daily XP chart using Plotly with course-based colors."""
+        # Calculate daily XP with dominant course colors
+        colored_df = self._calculate_daily_xp_with_dominant_course()
         fig = go.Figure()
-        
-        # Add daily XP bars
-        fig.add_trace(go.Bar(
-            x=df['date'],
-            y=df['xp_numeric'],
-            name='Daily XP',
-            marker_color='#A23B72',
-            opacity=0.8,
-            hovertemplate='<b>%{x|%Y-%m-%d}</b><br>Daily XP: %{y}<extra></extra>'
-        ))
-        
-        # Add trend line (7-day moving average)
+
+        # Generate colors dynamically for all courses
+        colors = self._generate_course_colors()
+        # Ensure we have a default color for unknown courses
+        colors['Unknown'] = '#2E86AB'
+
+        # Create segments for different colors
+        if not colored_df.empty:
+            # Split the data into segments where the dominant course changes
+            segments = []
+            current_course = colored_df.iloc[0]['dominant_course']
+            start_idx = 0
+            for i in range(1, len(colored_df)):
+                if colored_df.iloc[i]['dominant_course'] != current_course:
+                    # Create a segment from start_idx to i-1
+                    segment = colored_df.iloc[start_idx:i]
+                    segments.append((segment, current_course))
+                    current_course = colored_df.iloc[i]['dominant_course']
+                    start_idx = i
+            # Add the last segment
+            segment = colored_df.iloc[start_idx:]
+            segments.append((segment, current_course))
+
+            # Add each segment as a separate trace
+        for segment, course in segments:
+            color = colors.get(course, colors['Unknown'])
+            # Create custom hover text for each data point
+            hover_text = []
+            for date, daily_xp in zip(segment['date'], segment['xp_numeric']):
+                hover_info = f'Main Course: {course}<br>Daily XP: {daily_xp}'
+                hover_text.append(hover_info)
+
+            fig.add_trace(go.Bar(
+                x=segment['date'],
+                y=segment['xp_numeric'],
+                name=f'Daily XP ({course})',
+                marker_color=color,
+                opacity=0.8,
+                hovertext=hover_text,
+                hovertemplate='%{hovertext}<extra></extra>',
+                showlegend=False
+            ))
+
+        # Add trend line (7-day moving average) with standard hover for unified mode
         if len(df) >= 7:
             df['trend'] = df['xp_numeric'].rolling(window=7, center=False).mean()
             fig.add_trace(go.Scatter(
@@ -561,18 +636,31 @@ class ChartGenerator:
                 mode='lines',
                 name='7-Day Average',
                 line=dict(color='#F18F01', width=2),
-                hovertemplate='<b>%{x|%Y-%m-%d}</b><br>7-Day Avg: %{y:.1f}<extra></extra>'
+                hovertemplate='7-Day Avg: %{y:.1f}<extra></extra>'
             ))
-        
+
+        # Create a custom legend showing course colors in appearance order
+        legend_items = []
+        course_order = self._get_course_appearance_order()
+        # Filter to only courses that appear as dominant courses, in appearance order
+        for course in course_order:
+            if course in colored_df['dominant_course'].values and course != 'Unknown':
+                color = colors.get(course, colors['Unknown'])
+                # Calculate total XP for this course
+                course_total = self.df[self.df['Course'] == course]['xp_numeric'].sum()
+                legend_name = f"{course} ({course_total:,} XP)"
+                legend_items.append(f'<span style="color:{color}">●</span> {legend_name}')
+
         # Update layout
         fig.update_layout(
-            title="Daily XP Trend",
+            title="Daily XP Trend by Course",
             xaxis_title="Date",
             yaxis_title="Daily XP",
             hovermode='x unified',
             template='plotly_white',
             showlegend=True,
-            height=600,
+            height=650,  # Increased height to accommodate legend
+            margin=dict(t=100, b=50, l=50, r=50),  # Add more top margin for legend
             xaxis=dict(
                 tickformat='%Y-%m-%d',
                 tickangle=45
@@ -580,62 +668,133 @@ class ChartGenerator:
             yaxis=dict(
                 title="Daily XP",
                 tickformat=',.0f'
+            ),
+            legend=dict(
+                title="Course (Total XP)",
+                orientation="v",
+                yanchor="top",
+                y=0.99,
+                xanchor="right",
+                x=0.99,
+                bgcolor="rgba(255,255,255,0.9)",
+                bordercolor="#CCCCCC",
+                borderwidth=1,
+                tracegroupgap=5
             )
         )
-        
+
+        # Add course legend traces
+        for course in course_order:
+            if course in colored_df['dominant_course'].values and course != 'Unknown':
+                color = colors.get(course, colors['Unknown'])
+                course_total = self.df[self.df['Course'] == course]['xp_numeric'].sum()
+                legend_name = f"{course} ({course_total:,} XP)"
+                fig.add_trace(go.Scatter(
+                    x=[None], y=[None],
+                    mode='markers',
+                    name=legend_name,
+                    marker=dict(color=color, size=10),
+                    showlegend=True
+                ))
+
         # Save as HTML
         output_file = f"{output_path}.html"
         fig.write_html(output_file)
-        
+
         return output_file
     
     def _generate_static_daily_xp(self, df: pd.DataFrame, output_path: str) -> str:
-        """Generate static daily XP chart using Matplotlib."""
-        plt.figure(figsize=(14, 6))
-        
+        """Generate static daily XP chart using Matplotlib with course-based colors."""
+        # Calculate daily XP with dominant course colors
+        colored_df = self._calculate_daily_xp_with_dominant_course()
+
+        plt.figure(figsize=(14, 8))
+
         # Set style
         plt.style.use('default')
-        
-        # Create bar chart
-        bars = plt.bar(df['date'], df['xp_numeric'], 
-                      color='#A23B72', alpha=0.8, width=0.8)
-        
-        # Add trend line (7-day moving average)
+
+        # Generate colors dynamically for all courses
+        colors = self._generate_course_colors()
+        # Ensure we have a default color for unknown courses
+        colors['Unknown'] = '#2E86AB'
+
+        # Plot colored segments
+        if not colored_df.empty:
+            # Split the data into segments where the dominant course changes
+            segments = []
+            current_course = colored_df.iloc[0]['dominant_course']
+            start_idx = 0
+            for i in range(1, len(colored_df)):
+                if colored_df.iloc[i]['dominant_course'] != current_course:
+                    # Create a segment from start_idx to i-1
+                    segment = colored_df.iloc[start_idx:i]
+                    segments.append((segment, current_course))
+                    current_course = colored_df.iloc[i]['dominant_course']
+                    start_idx = i
+            # Add the last segment
+            segment = colored_df.iloc[start_idx:]
+            segments.append((segment, current_course))
+
+            # Plot each segment with its color
+            for segment, course in segments:
+                color = colors.get(course, colors['Unknown'])
+                plt.bar(segment['date'], segment['xp_numeric'],
+                       color=color, alpha=0.8, width=0.8,
+                       label=f'{course}')
+
+        # Add trend line (7-day moving average) - use the original df for calculation
         if len(df) >= 7:
             df['trend'] = df['xp_numeric'].rolling(window=7, center=False).mean()
-            plt.plot(df['date'], df['trend'], 
-                    color='#F18F01', linewidth=2, 
-                    label='7-Day Average')
-        
+            plt.plot(df['date'], df['trend'],
+                    color='#F18F01', linewidth=2,
+                    label='7-Day Average', zorder=10)
+
         # Formatting
-        plt.title("Daily XP Trend",
+        plt.title("Daily XP Trend by Course",
                  fontsize=16, fontweight='bold')
         plt.xlabel("Date", fontsize=12)
         plt.ylabel("Daily XP", fontsize=12)
-        
+
         # Format x-axis
         plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
         interval = max(1, len(df) // 15)
         plt.gca().xaxis.set_major_locator(mdates.DayLocator(interval=interval))
         plt.xticks(rotation=45)
-        
+
         # Format y-axis
         plt.gca().yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{int(x):,}'))
-        
+
         # Add grid
         plt.grid(True, alpha=0.3)
-        
-        # Add legend
-        plt.legend()
-        
-        # Adjust layout
+
+        # Create custom legend with course totals
+        legend_elements = []
+        course_order = self._get_course_appearance_order()
+        for course in course_order:
+            if course in colored_df['dominant_course'].values and course != 'Unknown':
+                color = colors.get(course, colors['Unknown'])
+                course_total = self.df[self.df['Course'] == course]['xp_numeric'].sum()
+                label_name = f"{course} ({course_total:,} XP)"
+                legend_elements.append(plt.Rectangle((0,0), 1, 1, color=color, alpha=0.8, label=label_name))
+
+        # Add 7-day average to legend
+        legend_elements.append(plt.Line2D([0], [0], color='#F18F01', linewidth=2, label='7-Day Average'))
+
+        if legend_elements:
+            # Place legend inside the plot area in the upper right
+            plt.legend(handles=legend_elements, loc='upper right', framealpha=0.95,
+                      fancybox=True, shadow=True, fontsize=9)
+
+        # Adjust layout to make room for data
         plt.tight_layout()
-        
+        # Adjust right margin slightly to accommodate legend
+        plt.subplots_adjust(right=0.9)
+
         # Save as PNG
         output_file = f"{output_path}.png"
         plt.savefig(output_file, dpi=300, bbox_inches='tight')
         plt.close()
-        
+
         return output_file
     
     def generate_combined_xp_dashboard(self, output_path: Optional[str] = None) -> str:
