@@ -1022,35 +1022,147 @@ class ChartGenerator:
         
         return output_file
     
-    def generate_weekly_daily_stats_chart(self, output_path: Optional[str] = None, 
-                                        interactive: bool = True) -> str:
-        """Generate weekly and daily XP statistics chart.
-        
+    def generate_multi_level_stats_chart(self, output_path: Optional[str] = None,
+                                      interactive: bool = True) -> str:
+        """Generate monthly, weekly and daily XP statistics comparison chart.
+
         Args:
             output_path: Output path for the chart file
             interactive: Whether to generate interactive (Plotly) or static (Matplotlib) chart
-            
+
         Returns:
             Path to the generated chart file
         """
         if self.df.empty:
             raise ValueError("No data available for chart generation")
-        
-        stats_data = self._calculate_weekly_daily_stats()
-        
+
+        stats_data = self._calculate_monthly_weekly_daily_stats()
+
         if output_path is None:
-            output_path = self.json_path.parent / "weekly_daily_stats_chart"
-        
+            output_path = self.json_path.parent / "multi_level_stats_chart"
+
         if interactive:
-            return self._generate_interactive_weekly_daily_stats(stats_data, output_path)
+            return self._generate_interactive_multi_level_stats(stats_data, output_path)
         else:
-            return self._generate_static_weekly_daily_stats(stats_data, output_path)
+            return self._generate_static_multi_level_stats(stats_data, output_path)
     
+    def _generate_interactive_multi_level_stats(self, stats_data: Dict[str, pd.DataFrame], output_path: str) -> str:
+        """Generate interactive monthly/weekly/daily stats chart using Plotly."""
+        daily_df = stats_data['daily']
+        weekly_df = stats_data['weekly']
+        monthly_df = stats_data['monthly']
+
+        # Create subplots with 3 rows and 2 columns
+        # Order: Daily (row 1) → Weekly (row 2) → Monthly (row 3)
+        # First column: XP trends, Second column: Task counts
+        fig = make_subplots(
+            rows=3, cols=2,
+            subplot_titles=('Daily XP Trend', 'Daily Task Count',
+                          'Weekly XP Trend', 'Weekly Task Count',
+                          'Monthly XP Trend', 'Monthly Task Count'),
+            specs=[[{"secondary_y": False}, {"secondary_y": False}],
+                   [{"secondary_y": False}, {"secondary_y": False}],
+                   [{"secondary_y": False}, {"secondary_y": False}]]
+        )
+
+        # Daily XP trend (row 1, col 1)
+        fig.add_trace(go.Scatter(
+            x=daily_df['Date'],
+            y=daily_df['Total XP'],
+            mode='lines+markers',
+            name='Daily XP',
+            line=dict(color='#2E86AB', width=2),
+            marker=dict(size=4),
+            showlegend=False
+        ), row=1, col=1)
+
+        # Daily task count (row 1, col 2)
+        fig.add_trace(go.Bar(
+            x=daily_df['Date'],
+            y=daily_df['Task Count'],
+            name='Daily Tasks',
+            marker_color='#2E86AB',
+            opacity=0.8,
+            showlegend=False
+        ), row=1, col=2)
+
+        # Weekly XP trend (row 2, col 1)
+        fig.add_trace(go.Scatter(
+            x=weekly_df['Week Start'],
+            y=weekly_df['Total XP'],
+            mode='lines+markers',
+            name='Weekly XP',
+            line=dict(color='#A23B72', width=3),
+            marker=dict(size=6),
+            showlegend=False
+        ), row=2, col=1)
+
+        # Weekly task count (row 2, col 2)
+        fig.add_trace(go.Bar(
+            x=weekly_df['Week Start'],
+            y=weekly_df['Task Count'],
+            name='Weekly Tasks',
+            marker_color='#A23B72',
+            opacity=0.8,
+            showlegend=False
+        ), row=2, col=2)
+
+        # Monthly XP trend (row 3, col 1)
+        fig.add_trace(go.Scatter(
+            x=monthly_df['Month Start'],
+            y=monthly_df['Total XP'],
+            mode='lines+markers',
+            name='Monthly XP',
+            line=dict(color='#C73E1D', width=4),
+            marker=dict(size=8),
+            showlegend=False
+        ), row=3, col=1)
+
+        # Monthly task count (row 3, col 2)
+        fig.add_trace(go.Bar(
+            x=monthly_df['Month Start'],
+            y=monthly_df['Task Count'],
+            name='Monthly Tasks',
+            marker_color='#C73E1D',
+            opacity=0.8,
+            showlegend=False
+        ), row=3, col=2)
+
+        # Update layout
+        fig.update_layout(
+            title="Monthly, Weekly & Daily Learning Statistics Comparison",
+            template='plotly_white',
+            height=1200,
+            showlegend=True
+        )
+
+        # Update x-axes
+        fig.update_xaxes(title_text="Date", row=1, col=1)
+        fig.update_xaxes(title_text="Date", row=1, col=2)
+        fig.update_xaxes(title_text="Week", row=2, col=1)
+        fig.update_xaxes(title_text="Week", row=2, col=2)
+        fig.update_xaxes(title_text="Month", row=3, col=1)
+        fig.update_xaxes(title_text="Month", row=3, col=2)
+
+        # Update y-axes
+        fig.update_yaxes(title_text="XP", row=1, col=1)
+        fig.update_yaxes(title_text="Task Count", row=1, col=2)
+        fig.update_yaxes(title_text="XP", row=2, col=1)
+        fig.update_yaxes(title_text="Task Count", row=2, col=2)
+        fig.update_yaxes(title_text="XP", row=3, col=1)
+        fig.update_yaxes(title_text="Task Count", row=3, col=2)
+
+        # Save as HTML
+        output_file = f"{output_path}.html"
+        fig.write_html(output_file)
+
+        return output_file
+
     def _generate_interactive_weekly_daily_stats(self, stats_data: Dict[str, pd.DataFrame], output_path: str) -> str:
         """Generate interactive weekly/daily stats chart using Plotly."""
         daily_df = stats_data['daily']
         weekly_df = stats_data['weekly']
-        
+
         # Create subplots
         fig = make_subplots(
             rows=2, cols=2,
@@ -1058,7 +1170,7 @@ class ChartGenerator:
             specs=[[{"secondary_y": False}, {"secondary_y": False}],
                    [{"secondary_y": False}, {"secondary_y": False}]]
         )
-        
+
         # Daily XP trend
         fig.add_trace(go.Scatter(
             x=daily_df['Date'],
@@ -1069,7 +1181,7 @@ class ChartGenerator:
             marker=dict(size=4),
             showlegend=False
         ), row=1, col=1)
-        
+
         # Weekly XP trend
         fig.add_trace(go.Scatter(
             x=weekly_df['Week Start'],
@@ -1080,7 +1192,7 @@ class ChartGenerator:
             marker=dict(size=6),
             showlegend=False
         ), row=1, col=2)
-        
+
         # Daily task count
         fig.add_trace(go.Bar(
             x=daily_df['Date'],
@@ -1090,7 +1202,7 @@ class ChartGenerator:
             opacity=0.8,
             showlegend=False
         ), row=2, col=1)
-        
+
         # Weekly task count
         fig.add_trace(go.Bar(
             x=weekly_df['Week Start'],
@@ -1100,7 +1212,7 @@ class ChartGenerator:
             opacity=0.8,
             showlegend=False
         ), row=2, col=2)
-        
+
         # Update layout
         fig.update_layout(
             title="Weekly & Daily XP Statistics",
@@ -1108,79 +1220,174 @@ class ChartGenerator:
             height=800,
             showlegend=True
         )
-        
+
         # Update x-axes
         fig.update_xaxes(title_text="Date", row=1, col=1)
         fig.update_xaxes(title_text="Week Start", row=1, col=2)
         fig.update_xaxes(title_text="Date", row=2, col=1)
         fig.update_xaxes(title_text="Week Start", row=2, col=2)
-        
+
         # Update y-axes
         fig.update_yaxes(title_text="XP", row=1, col=1)
         fig.update_yaxes(title_text="XP", row=1, col=2)
         fig.update_yaxes(title_text="Task Count", row=2, col=1)
         fig.update_yaxes(title_text="Task Count", row=2, col=2)
-        
+
         # Save as HTML
         output_file = f"{output_path}.html"
         fig.write_html(output_file)
-        
+
         return output_file
     
+    def _generate_static_multi_level_stats(self, stats_data: Dict[str, pd.DataFrame], output_path: str) -> str:
+        """Generate static monthly/weekly/daily stats chart using Matplotlib."""
+        daily_df = stats_data['daily']
+        weekly_df = stats_data['weekly']
+        monthly_df = stats_data['monthly']
+
+        # Create subplots with 3 rows and 2 columns
+        fig, axes = plt.subplots(3, 2, figsize=(18, 16))
+
+        # Daily XP trend (row 1, col 1)
+        axes[0, 0].plot(daily_df['Date'], daily_df['Total XP'],
+                       marker='o', linewidth=2, markersize=4, color='#2E86AB')
+        axes[0, 0].set_title('Daily XP Trend', fontsize=14, fontweight='bold')
+        axes[0, 0].set_xlabel('Date')
+        axes[0, 0].set_ylabel('XP')
+        axes[0, 0].tick_params(axis='x', rotation=45)
+
+        # Daily task count (row 1, col 2)
+        axes[0, 1].bar(daily_df['Date'], daily_df['Task Count'],
+                      color='#2E86AB', alpha=0.8, width=0.8)
+        axes[0, 1].set_title('Daily Task Count', fontsize=14, fontweight='bold')
+        axes[0, 1].set_xlabel('Date')
+        axes[0, 1].set_ylabel('Task Count')
+        axes[0, 1].tick_params(axis='x', rotation=45)
+
+        # Weekly XP trend (row 2, col 1)
+        axes[1, 0].plot(weekly_df['Week Start'], weekly_df['Total XP'],
+                       marker='o', linewidth=3, markersize=6, color='#A23B72')
+        axes[1, 0].set_title('Weekly XP Trend', fontsize=14, fontweight='bold')
+        axes[1, 0].set_xlabel('Week')
+        axes[1, 0].set_ylabel('XP')
+        axes[1, 0].tick_params(axis='x', rotation=45)
+
+        # Weekly task count (row 2, col 2)
+        axes[1, 1].bar(weekly_df['Week Start'], weekly_df['Task Count'],
+                      color='#A23B72', alpha=0.8, width=5)
+        axes[1, 1].set_title('Weekly Task Count', fontsize=14, fontweight='bold')
+        axes[1, 1].set_xlabel('Week')
+        axes[1, 1].set_ylabel('Task Count')
+        axes[1, 1].tick_params(axis='x', rotation=45)
+
+        # Monthly XP trend (row 3, col 1)
+        axes[2, 0].plot(monthly_df['Month Start'], monthly_df['Total XP'],
+                       marker='o', linewidth=4, markersize=8, color='#C73E1D')
+        axes[2, 0].set_title('Monthly XP Trend', fontsize=14, fontweight='bold')
+        axes[2, 0].set_xlabel('Month')
+        axes[2, 0].set_ylabel('XP')
+        axes[2, 0].tick_params(axis='x', rotation=45)
+
+        # Monthly task count (row 3, col 2)
+        axes[2, 1].bar(monthly_df['Month Start'], monthly_df['Task Count'],
+                      color='#C73E1D', alpha=0.8, width=20)
+        axes[2, 1].set_title('Monthly Task Count', fontsize=14, fontweight='bold')
+        axes[2, 1].set_xlabel('Month')
+        axes[2, 1].set_ylabel('Task Count')
+        axes[2, 1].tick_params(axis='x', rotation=45)
+
+        # Main title
+        fig.suptitle("Monthly, Weekly & Daily Learning Statistics Comparison",
+                    fontsize=18, fontweight='bold', y=0.98)
+
+        # Adjust layout to prevent overlap
+        plt.tight_layout(rect=[0, 0.02, 1, 0.96])
+
+        # Save as PNG
+        output_file = f"{output_path}.png"
+        plt.savefig(output_file, dpi=300, bbox_inches='tight')
+        plt.close()
+
+        return output_file
+
     def _generate_static_weekly_daily_stats(self, stats_data: Dict[str, pd.DataFrame], output_path: str) -> str:
         """Generate static weekly/daily stats chart using Matplotlib."""
         daily_df = stats_data['daily']
         weekly_df = stats_data['weekly']
-        
+
         fig, axes = plt.subplots(2, 2, figsize=(16, 12))
-        
+
         # Daily XP trend
-        axes[0, 0].plot(daily_df['Date'], daily_df['Total XP'], 
+        axes[0, 0].plot(daily_df['Date'], daily_df['Total XP'],
                        marker='o', linewidth=2, markersize=4, color='#2E86AB')
         axes[0, 0].set_title('Daily XP Trend')
         axes[0, 0].set_xlabel('Date')
         axes[0, 0].set_ylabel('XP')
         axes[0, 0].tick_params(axis='x', rotation=45)
-        
+
         # Weekly XP trend
-        axes[0, 1].plot(weekly_df['Week Start'], weekly_df['Total XP'], 
+        axes[0, 1].plot(weekly_df['Week Start'], weekly_df['Total XP'],
                        marker='o', linewidth=3, markersize=6, color='#A23B72')
         axes[0, 1].set_title('Weekly XP Trend')
         axes[0, 1].set_xlabel('Week Start')
         axes[0, 1].set_ylabel('XP')
         axes[0, 1].tick_params(axis='x', rotation=45)
-        
+
         # Daily task count
-        axes[1, 0].bar(daily_df['Date'], daily_df['Task Count'], 
+        axes[1, 0].bar(daily_df['Date'], daily_df['Task Count'],
                       color='#F18F01', alpha=0.8)
         axes[1, 0].set_title('Daily Task Count')
         axes[1, 0].set_xlabel('Date')
         axes[1, 0].set_ylabel('Task Count')
         axes[1, 0].tick_params(axis='x', rotation=45)
-        
+
         # Weekly task count
-        axes[1, 1].bar(weekly_df['Week Start'], weekly_df['Task Count'], 
+        axes[1, 1].bar(weekly_df['Week Start'], weekly_df['Task Count'],
                       color='#C73E1D', alpha=0.8)
         axes[1, 1].set_title('Weekly Task Count')
         axes[1, 1].set_xlabel('Week Start')
         axes[1, 1].set_ylabel('Task Count')
         axes[1, 1].tick_params(axis='x', rotation=45)
-        
+
         # Main title
         fig.suptitle("Weekly & Daily XP Statistics",
                     fontsize=16, fontweight='bold')
-        
+
         # Adjust layout
         plt.tight_layout()
-        
+
         # Save as PNG
         output_file = f"{output_path}.png"
         plt.savefig(output_file, dpi=300, bbox_inches='tight')
         plt.close()
-        
+
         return output_file
-    
-    def generate_efficiency_trend_chart(self, output_path: Optional[str] = None, 
+
+    def generate_weekly_daily_stats_chart(self, output_path: Optional[str] = None,
+                                        interactive: bool = True) -> str:
+        """Generate weekly and daily XP statistics chart (legacy method for compatibility).
+
+        Args:
+            output_path: Output path for the chart file
+            interactive: Whether to generate interactive (Plotly) or static (Matplotlib) chart
+
+        Returns:
+            Path to the generated chart file
+        """
+        if self.df.empty:
+            raise ValueError("No data available for chart generation")
+
+        stats_data = self._calculate_monthly_weekly_daily_stats()
+
+        if output_path is None:
+            output_path = self.json_path.parent / "weekly_daily_stats_chart"
+
+        if interactive:
+            return self._generate_interactive_weekly_daily_stats(stats_data, output_path)
+        else:
+            return self._generate_static_weekly_daily_stats(stats_data, output_path)
+
+    def generate_efficiency_trend_chart(self, output_path: Optional[str] = None,
                                      interactive: bool = True) -> str:
         """Generate learning efficiency trend chart.
         
@@ -2580,38 +2787,57 @@ class ChartGenerator:
         
         return task_distribution
     
-    def _calculate_weekly_daily_stats(self) -> Dict[str, pd.DataFrame]:
-        """Calculate weekly and daily XP statistics."""
+    def _calculate_monthly_weekly_daily_stats(self) -> Dict[str, pd.DataFrame]:
+        """Calculate monthly, weekly and daily XP statistics."""
         if self.df.empty:
             return {}
-        
+
         # Daily stats
         daily_stats = self.df.groupby('date').agg({
             'xp_numeric': ['sum', 'count', 'mean']
         }).reset_index()
         daily_stats.columns = ['Date', 'Total XP', 'Task Count', 'Average XP']
-        
+
         # Add day of week
         daily_stats['Day of Week'] = daily_stats['Date'].dt.day_name()
-        
+
         # Weekly stats
         weekly_stats = self.df.copy()
         weekly_stats['Week'] = weekly_stats['date'].dt.isocalendar().week
         weekly_stats['Year'] = weekly_stats['date'].dt.year
-        
+
         weekly_summary = weekly_stats.groupby(['Year', 'Week']).agg({
             'xp_numeric': ['sum', 'count', 'mean']
         }).reset_index()
         weekly_summary.columns = ['Year', 'Week', 'Total XP', 'Task Count', 'Average XP']
-        
+
         # Create week start date (Monday of each week)
         weekly_summary['Week Start'] = pd.to_datetime(
             weekly_summary['Year'].astype(str) + '-01-01'
         ) + pd.to_timedelta((weekly_summary['Week'] - 1) * 7, unit='D')
-        
+
+        # Monthly stats
+        monthly_stats = self.df.copy()
+        monthly_stats['Month'] = monthly_stats['date'].dt.month
+        monthly_stats['Year'] = monthly_stats['date'].dt.year
+
+        monthly_summary = monthly_stats.groupby(['Year', 'Month']).agg({
+            'xp_numeric': ['sum', 'count', 'mean']
+        }).reset_index()
+        monthly_summary.columns = ['Year', 'Month', 'Total XP', 'Task Count', 'Average XP']
+
+        # Create month start date
+        monthly_summary['Month Start'] = pd.to_datetime(
+            monthly_summary['Year'].astype(str) + '-' + monthly_summary['Month'].astype(str).str.zfill(2) + '-01'
+        )
+
+        # Add month name
+        monthly_summary['Month Name'] = monthly_summary['Month Start'].dt.strftime('%B')
+
         return {
             'daily': daily_stats,
-            'weekly': weekly_summary
+            'weekly': weekly_summary,
+            'monthly': monthly_summary
         }
     
     def _calculate_efficiency_trend(self) -> pd.DataFrame:
