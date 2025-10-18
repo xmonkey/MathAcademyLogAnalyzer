@@ -218,15 +218,15 @@ def export(pdf_path, output_path, json_only, excel_only):
 @click.option("--output", "-o", type=click.Path(), help="Output directory for chart files")
 @click.option("--static", is_flag=True, help="Generate static PNG charts instead of interactive HTML")
 @click.option("--dashboard", is_flag=True, help="Generate combined dashboard")
-@click.option("--chart-type", type=click.Choice(['all', 'xp', 'task-type', 'multi-level', 'weekly-daily', 'efficiency', 'weekday', 'daily-dist', 'dashboard']),
+@click.option("--chart-type", type=click.Choice(['all', 'xp', 'task-type', 'multi-level', 'efficiency', 'weekday', 'daily-dist', 'dashboard']),
               default='all', help="Specify chart type to generate")
 def chart(json_path, output, static, dashboard, chart_type):
     """Generate charts from learning progress JSON data.
 
     Chart types: XP charts (cumulative and daily trends), task type distribution
     (dual pie charts: task count and XP), multi-level statistics (monthly/weekly/daily
-    comparison), weekly/daily XP statistics, learning efficiency trend, average daily
-    XP by weekday, daily XP distribution (histogram), and comprehensive dashboard.
+    comparison), learning efficiency trend, average daily XP by weekday, daily XP
+    distribution (histogram), and comprehensive dashboard.
 
     By default, generates all charts. Use --chart-type for specific charts.
     Use --static for PNG images instead of interactive HTML.
@@ -290,12 +290,6 @@ def chart(json_path, output, static, dashboard, chart_type):
                 interactive=not static
             )
             generated_charts.append(f"Multi-level statistics chart: {multi_level_path}")
-        elif chart_type == 'weekly-daily':
-            weekly_daily_path = chart_gen.generate_weekly_daily_stats_chart(
-                str(output_dir / "weekly_daily_stats"),
-                interactive=not static
-            )
-            generated_charts.append(f"Weekly/daily statistics chart: {weekly_daily_path}")
         
         if chart_type == 'all' or chart_type == 'efficiency':
             efficiency_path = chart_gen.generate_efficiency_trend_chart(
@@ -468,12 +462,6 @@ def generate_all(pdf_path, output_dir, name, static_only, interactive_only, data
                 )
                 generated_files.append(f"Interactive Multi-level Stats: {multi_level_path}")
 
-                weekly_daily_path = chart_gen.generate_weekly_daily_stats_chart(
-                    str(charts_dir / f"{base_name}_weekly_daily_stats"),
-                    interactive=True
-                )
-                generated_files.append(f"Interactive Weekly/Daily Stats: {weekly_daily_path}")
-
                 efficiency_path = chart_gen.generate_efficiency_trend_chart(
                     str(charts_dir / f"{base_name}_efficiency_trend"),
                     interactive=True
@@ -523,12 +511,6 @@ def generate_all(pdf_path, output_dir, name, static_only, interactive_only, data
                     interactive=False
                 )
                 generated_files.append(f"Static Multi-level Stats: {static_multi_level_path}")
-
-                static_weekly_daily_path = chart_gen.generate_weekly_daily_stats_chart(
-                    str(charts_dir / f"{base_name}_weekly_daily_stats_static"),
-                    interactive=False
-                )
-                generated_files.append(f"Static Weekly/Daily Stats: {static_weekly_daily_path}")
 
                 static_efficiency_path = chart_gen.generate_efficiency_trend_chart(
                     str(charts_dir / f"{base_name}_efficiency_trend_static"),
