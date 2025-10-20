@@ -1057,9 +1057,9 @@ class ChartGenerator:
         # First column: XP by task type (bar), Second column: Task counts by task type (bar)
         fig = make_subplots(
             rows=3, cols=2,
-            subplot_titles=('Daily XP by Task Type', 'Daily Task Count by Task Type',
-                          'Weekly XP by Task Type', 'Weekly Task Count by Task Type',
-                          'Monthly XP by Task Type', 'Monthly Task Count by Task Type'),
+            subplot_titles=('Daily XP', 'Daily Task Count',
+                          'Weekly XP', 'Weekly Task Count',
+                          'Monthly XP', 'Monthly Task Count'),
             specs=[[{"secondary_y": False}, {"secondary_y": False}],
                    [{"secondary_y": False}, {"secondary_y": False}],
                    [{"secondary_y": False}, {"secondary_y": False}]]
@@ -1071,7 +1071,7 @@ class ChartGenerator:
             fig.add_trace(go.Bar(
                 x=df['Date'],
                 y=df['Total XP'],
-                name=f'{task_type} XP',
+                name=f'{task_type}',
                 marker_color=task_data['color'],
                 opacity=0.8,
                 showlegend=True
@@ -1139,10 +1139,19 @@ class ChartGenerator:
 
         # Update layout
         fig.update_layout(
-            title="Monthly, Weekly & Daily Learning Statistics by Task Type",
+            title="Monthly, Weekly & Daily Learning Statistics",
             template='plotly_white',
             height=1200,
             showlegend=True,
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=-0.05,  # Position legend below the chart
+                xanchor="center",
+                x=0.5,
+                itemclick=False,  # Disable click events
+                itemdoubleclick=False  # Disable double-click events
+            ),
             barmode='stack'  # Stack bars for each time period
         )
 
@@ -1184,7 +1193,14 @@ class ChartGenerator:
             for task_data in data_dict.values():
                 all_dates.update(task_data['data']['Date' if 'Date' in task_data['data'].columns else
                                                     'Week Start' if 'Week Start' in task_data['data'].columns else 'Month Start'])
-            all_dates = sorted(list(all_dates))
+
+            # For daily data, create complete date range
+            if 'Date' in next(iter(data_dict.values()))['data'].columns:
+                min_date = min(all_dates)
+                max_date = max(all_dates)
+                all_dates = pd.date_range(start=min_date, end=max_date, freq='D')
+            else:
+                all_dates = sorted(list(all_dates))
 
             # Prepare data for stacking
             bottom_values = [0] * len(all_dates)
@@ -1217,54 +1233,95 @@ class ChartGenerator:
                 for i in range(len(bottom_values)):
                     bottom_values[i] += y_values[i]
 
-            # Format date labels
-            if all_dates and hasattr(all_dates[0], 'day'):
-                # Daily or monthly dates
-                date_labels = [d.strftime('%m/%d') if len(all_dates) <= 31 else d.strftime('%m/%y') for d in all_dates]
+            # Format date labels - ensure uniform spacing and avoid overlap
+            if all_dates is not None and len(all_dates) > 0 and hasattr(all_dates[0], 'day'):
+                # Calculate optimal interval to show max 8-10 labels uniformly
+                max_labels = 8
+                interval = max(1, len(all_dates) // max_labels)
+
+                if len(all_dates) <= 15:
+                    # Small datasets - show all dates
+                    date_labels = [d.strftime('%m/%d') for d in all_dates]
+                    tick_positions = positions
+                else:
+                    # Medium to large datasets - show uniformly spaced dates
+                    date_labels = []
+                    tick_positions = []
+
+                    # Always show the first date
+                    date_labels.append(all_dates[0].strftime('%m/%d'))
+                    tick_positions.append(0)
+
+                    # Show uniformly spaced dates in between
+                    for i in range(1, len(all_dates) - 1):
+                        if i % interval == 0:
+                            date_labels.append(all_dates[i].strftime('%m/%d'))
+                            tick_positions.append(i)
+
+                    # Always show the last date
+                    if len(all_dates) > 1:
+                        date_labels.append(all_dates[-1].strftime('%m/%d'))
+                        tick_positions.append(len(all_dates) - 1)
+
             else:
                 # Weekly dates
                 date_labels = [d.strftime('%m/%d') for d in all_dates]
+                tick_positions = positions
 
-            ax.set_xticks(positions)
+            ax.set_xticks(tick_positions)
             ax.set_xticklabels(date_labels, rotation=45)
 
             # Set labels and title
             ax.set_xlabel(x_label)
             ax.set_ylabel(y_label)
             ax.set_title(title, fontsize=14, fontweight='bold')
-            ax.legend()
+            # Remove individual legends - we'll create a shared one at the bottom
             ax.grid(True, alpha=0.3)
 
         # Daily XP by task type (row 1, col 1)
         plot_stacked_bars(axes[0, 0], task_type_stats['daily'],
-                         'Daily XP by Task Type', 'Date', 'XP', 'Total XP')
+                         'Daily XP', 'Date', 'XP', 'Total XP')
 
         # Daily task count by task type (row 1, col 2)
         plot_stacked_bars(axes[0, 1], task_type_stats['daily'],
-                         'Daily Task Count by Task Type', 'Date', 'Task Count', 'Task Count')
+                         'Daily Task Count', 'Date', 'Task Count', 'Task Count')
 
         # Weekly XP by task type (row 2, col 1)
         plot_stacked_bars(axes[1, 0], task_type_stats['weekly'],
-                         'Weekly XP by Task Type', 'Week', 'XP', 'Total XP')
+                         'Weekly XP', 'Week', 'XP', 'Total XP')
 
         # Weekly task count by task type (row 2, col 2)
         plot_stacked_bars(axes[1, 1], task_type_stats['weekly'],
-                         'Weekly Task Count by Task Type', 'Week', 'Task Count', 'Task Count')
+                         'Weekly Task Count', 'Week', 'Task Count', 'Task Count')
 
         # Monthly XP by task type (row 3, col 1)
         plot_stacked_bars(axes[2, 0], task_type_stats['monthly'],
-                         'Monthly XP by Task Type', 'Month', 'XP', 'Total XP')
+                         'Monthly XP', 'Month', 'XP', 'Total XP')
 
         # Monthly task count by task type (row 3, col 2)
         plot_stacked_bars(axes[2, 1], task_type_stats['monthly'],
-                         'Monthly Task Count by Task Type', 'Month', 'Task Count', 'Task Count')
+                         'Monthly Task Count', 'Month', 'Task Count', 'Task Count')
 
         # Main title
-        fig.suptitle("Monthly, Weekly & Daily Learning Statistics by Task Type",
+        fig.suptitle("Monthly, Weekly & Daily Learning Statistics",
                     fontsize=18, fontweight='bold', y=0.98)
 
-        # Adjust layout to prevent overlap
-        plt.tight_layout(rect=[0, 0.02, 1, 0.96])
+        # Create a shared legend at the bottom
+        # Create proxy artists for legend using the same colors as in the data
+        from matplotlib.patches import Patch
+        task_types = list(task_type_stats['daily'].keys())
+        colors = [task_type_stats['daily'][task_type]['color'] for task_type in task_types]
+        legend_elements = [Patch(facecolor=color, label=task_type)
+                          for task_type, color in zip(task_types, colors)]
+
+        # Add legend at the bottom center
+        fig.legend(handles=legend_elements, title="Task Types",
+                   loc='lower center', bbox_to_anchor=(0.5, -0.02), ncol=len(task_types),
+                   fontsize=12, title_fontsize=14)
+
+        # Adjust layout to make room for bottom legend
+        plt.tight_layout(rect=[0, 0.05, 1, 0.96])
+        plt.subplots_adjust(bottom=0.1)  # Make room for legend at bottom
 
         # Save as PNG
         output_file = f"{output_path}.png"
@@ -2738,7 +2795,8 @@ class ChartGenerator:
             'Review': '#A23B72',
             'Quiz': '#C73E1D',
             'Multistep': '#F18F01',
-            'Placement': '#6A994E'
+            'Placement': '#6A994E',
+            'Supplemental': '#8B5CF6'
         }
 
         result = {
@@ -2746,6 +2804,20 @@ class ChartGenerator:
             'weekly': {},
             'monthly': {}
         }
+
+        # Generate default colors for unknown task types if needed
+        default_colors = ['#6B7280', '#374151', '#1F2937', '#111827', '#4B5563',
+                         '#9CA3AF', '#D1D5DB', '#E5E7EB', '#F3F4F6', '#F9FAFB']
+        unknown_task_index = 0
+
+        def get_task_color(task_type):
+            """Get color for task type, using default color for unknown types."""
+            task_color = colors.get(task_type)
+            if task_color is None:
+                nonlocal unknown_task_index
+                task_color = default_colors[unknown_task_index % len(default_colors)]
+                unknown_task_index += 1
+            return task_color
 
         # Daily stats by task type
         for task_type in task_types:
@@ -2757,7 +2829,7 @@ class ChartGenerator:
                 daily_stats.columns = ['Date', 'Total XP', 'Task Count', 'Average XP']
                 result['daily'][task_type] = {
                     'data': daily_stats,
-                    'color': colors.get(task_type, '#808080')
+                    'color': get_task_color(task_type)
                 }
 
         # Weekly stats by task type
@@ -2779,7 +2851,7 @@ class ChartGenerator:
 
                 result['weekly'][task_type] = {
                     'data': weekly_summary,
-                    'color': colors.get(task_type, '#808080')
+                    'color': get_task_color(task_type)
                 }
 
         # Monthly stats by task type
@@ -2801,7 +2873,7 @@ class ChartGenerator:
 
                 result['monthly'][task_type] = {
                     'data': monthly_summary,
-                    'color': colors.get(task_type, '#808080')
+                    'color': get_task_color(task_type)
                 }
 
         return result
