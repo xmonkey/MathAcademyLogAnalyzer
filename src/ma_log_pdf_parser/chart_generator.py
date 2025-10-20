@@ -1047,93 +1047,103 @@ class ChartGenerator:
             return self._generate_static_multi_level_stats(stats_data, output_path)
     
     def _generate_interactive_multi_level_stats(self, stats_data: Dict[str, pd.DataFrame], output_path: str) -> str:
-        """Generate interactive monthly/weekly/daily stats chart using Plotly."""
-        daily_df = stats_data['daily']
-        weekly_df = stats_data['weekly']
-        monthly_df = stats_data['monthly']
+        """Generate interactive monthly/weekly/daily stats chart using Plotly with bar charts and task type differentiation."""
+        # Get both regular stats and task type breakdown
+        regular_stats = stats_data
+        task_type_stats = self._calculate_monthly_weekly_daily_stats_by_task_type()
 
         # Create subplots with 3 rows and 2 columns
         # Order: Daily (row 1) → Weekly (row 2) → Monthly (row 3)
-        # First column: XP trends, Second column: Task counts
+        # First column: XP by task type (bar), Second column: Task counts by task type (bar)
         fig = make_subplots(
             rows=3, cols=2,
-            subplot_titles=('Daily XP Trend', 'Daily Task Count',
-                          'Weekly XP Trend', 'Weekly Task Count',
-                          'Monthly XP Trend', 'Monthly Task Count'),
+            subplot_titles=('Daily XP by Task Type', 'Daily Task Count by Task Type',
+                          'Weekly XP by Task Type', 'Weekly Task Count by Task Type',
+                          'Monthly XP by Task Type', 'Monthly Task Count by Task Type'),
             specs=[[{"secondary_y": False}, {"secondary_y": False}],
                    [{"secondary_y": False}, {"secondary_y": False}],
                    [{"secondary_y": False}, {"secondary_y": False}]]
         )
 
-        # Daily XP trend (row 1, col 1)
-        fig.add_trace(go.Scatter(
-            x=daily_df['Date'],
-            y=daily_df['Total XP'],
-            mode='lines+markers',
-            name='Daily XP',
-            line=dict(color='#2E86AB', width=2),
-            marker=dict(size=4),
-            showlegend=False
-        ), row=1, col=1)
+        # Daily XP by task type (row 1, col 1) - Grouped bar chart
+        for task_type, task_data in task_type_stats['daily'].items():
+            df = task_data['data']
+            fig.add_trace(go.Bar(
+                x=df['Date'],
+                y=df['Total XP'],
+                name=f'{task_type} XP',
+                marker_color=task_data['color'],
+                opacity=0.8,
+                showlegend=True
+            ), row=1, col=1)
 
-        # Daily task count (row 1, col 2)
-        fig.add_trace(go.Bar(
-            x=daily_df['Date'],
-            y=daily_df['Task Count'],
-            name='Daily Tasks',
-            marker_color='#2E86AB',
-            opacity=0.8,
-            showlegend=False
-        ), row=1, col=2)
+        # Daily task count by task type (row 1, col 2) - Grouped bar chart
+        for task_type, task_data in task_type_stats['daily'].items():
+            df = task_data['data']
+            fig.add_trace(go.Bar(
+                x=df['Date'],
+                y=df['Task Count'],
+                name=f'{task_type} Tasks',
+                marker_color=task_data['color'],
+                opacity=0.8,
+                showlegend=False  # Hide duplicate legend
+            ), row=1, col=2)
 
-        # Weekly XP trend (row 2, col 1)
-        fig.add_trace(go.Scatter(
-            x=weekly_df['Week Start'],
-            y=weekly_df['Total XP'],
-            mode='lines+markers',
-            name='Weekly XP',
-            line=dict(color='#A23B72', width=3),
-            marker=dict(size=6),
-            showlegend=False
-        ), row=2, col=1)
+        # Weekly XP by task type (row 2, col 1) - Grouped bar chart
+        for task_type, task_data in task_type_stats['weekly'].items():
+            df = task_data['data']
+            fig.add_trace(go.Bar(
+                x=df['Week Start'],
+                y=df['Total XP'],
+                name=f'{task_type} XP',
+                marker_color=task_data['color'],
+                opacity=0.8,
+                showlegend=False  # Hide duplicate legend
+            ), row=2, col=1)
 
-        # Weekly task count (row 2, col 2)
-        fig.add_trace(go.Bar(
-            x=weekly_df['Week Start'],
-            y=weekly_df['Task Count'],
-            name='Weekly Tasks',
-            marker_color='#A23B72',
-            opacity=0.8,
-            showlegend=False
-        ), row=2, col=2)
+        # Weekly task count by task type (row 2, col 2) - Grouped bar chart
+        for task_type, task_data in task_type_stats['weekly'].items():
+            df = task_data['data']
+            fig.add_trace(go.Bar(
+                x=df['Week Start'],
+                y=df['Task Count'],
+                name=f'{task_type} Tasks',
+                marker_color=task_data['color'],
+                opacity=0.8,
+                showlegend=False  # Hide duplicate legend
+            ), row=2, col=2)
 
-        # Monthly XP trend (row 3, col 1)
-        fig.add_trace(go.Scatter(
-            x=monthly_df['Month Start'],
-            y=monthly_df['Total XP'],
-            mode='lines+markers',
-            name='Monthly XP',
-            line=dict(color='#C73E1D', width=4),
-            marker=dict(size=8),
-            showlegend=False
-        ), row=3, col=1)
+        # Monthly XP by task type (row 3, col 1) - Grouped bar chart
+        for task_type, task_data in task_type_stats['monthly'].items():
+            df = task_data['data']
+            fig.add_trace(go.Bar(
+                x=df['Month Start'],
+                y=df['Total XP'],
+                name=f'{task_type} XP',
+                marker_color=task_data['color'],
+                opacity=0.8,
+                showlegend=False  # Hide duplicate legend
+            ), row=3, col=1)
 
-        # Monthly task count (row 3, col 2)
-        fig.add_trace(go.Bar(
-            x=monthly_df['Month Start'],
-            y=monthly_df['Task Count'],
-            name='Monthly Tasks',
-            marker_color='#C73E1D',
-            opacity=0.8,
-            showlegend=False
-        ), row=3, col=2)
+        # Monthly task count by task type (row 3, col 2) - Grouped bar chart
+        for task_type, task_data in task_type_stats['monthly'].items():
+            df = task_data['data']
+            fig.add_trace(go.Bar(
+                x=df['Month Start'],
+                y=df['Task Count'],
+                name=f'{task_type} Tasks',
+                marker_color=task_data['color'],
+                opacity=0.8,
+                showlegend=False  # Hide duplicate legend
+            ), row=3, col=2)
 
         # Update layout
         fig.update_layout(
-            title="Monthly, Weekly & Daily Learning Statistics Comparison",
+            title="Monthly, Weekly & Daily Learning Statistics by Task Type",
             template='plotly_white',
             height=1200,
-            showlegend=True
+            showlegend=True,
+            barmode='stack'  # Stack bars for each time period
         )
 
         # Update x-axes
@@ -1159,64 +1169,98 @@ class ChartGenerator:
         return output_file
 
     def _generate_static_multi_level_stats(self, stats_data: Dict[str, pd.DataFrame], output_path: str) -> str:
-        """Generate static monthly/weekly/daily stats chart using Matplotlib."""
-        daily_df = stats_data['daily']
-        weekly_df = stats_data['weekly']
-        monthly_df = stats_data['monthly']
+        """Generate static monthly/weekly/daily stats chart using Matplotlib with bar charts and task type differentiation."""
+        # Get task type breakdown
+        task_type_stats = self._calculate_monthly_weekly_daily_stats_by_task_type()
 
         # Create subplots with 3 rows and 2 columns
         fig, axes = plt.subplots(3, 2, figsize=(18, 16))
 
-        # Daily XP trend (row 1, col 1)
-        axes[0, 0].plot(daily_df['Date'], daily_df['Total XP'],
-                       marker='o', linewidth=2, markersize=4, color='#2E86AB')
-        axes[0, 0].set_title('Daily XP Trend', fontsize=14, fontweight='bold')
-        axes[0, 0].set_xlabel('Date')
-        axes[0, 0].set_ylabel('XP')
-        axes[0, 0].tick_params(axis='x', rotation=45)
+        # Helper function to plot stacked bars
+        def plot_stacked_bars(ax, data_dict, title, x_label, y_label, value_column):
+            """Plot stacked bar chart for multiple task types."""
+            # Get all unique dates and sort them
+            all_dates = set()
+            for task_data in data_dict.values():
+                all_dates.update(task_data['data']['Date' if 'Date' in task_data['data'].columns else
+                                                    'Week Start' if 'Week Start' in task_data['data'].columns else 'Month Start'])
+            all_dates = sorted(list(all_dates))
 
-        # Daily task count (row 1, col 2)
-        axes[0, 1].bar(daily_df['Date'], daily_df['Task Count'],
-                      color='#2E86AB', alpha=0.8, width=0.8)
-        axes[0, 1].set_title('Daily Task Count', fontsize=14, fontweight='bold')
-        axes[0, 1].set_xlabel('Date')
-        axes[0, 1].set_ylabel('Task Count')
-        axes[0, 1].tick_params(axis='x', rotation=45)
+            # Prepare data for stacking
+            bottom_values = [0] * len(all_dates)
 
-        # Weekly XP trend (row 2, col 1)
-        axes[1, 0].plot(weekly_df['Week Start'], weekly_df['Total XP'],
-                       marker='o', linewidth=3, markersize=6, color='#A23B72')
-        axes[1, 0].set_title('Weekly XP Trend', fontsize=14, fontweight='bold')
-        axes[1, 0].set_xlabel('Week')
-        axes[1, 0].set_ylabel('XP')
-        axes[1, 0].tick_params(axis='x', rotation=45)
+            for task_type, task_data in data_dict.items():
+                df = task_data['data']
+                color = task_data['color']
 
-        # Weekly task count (row 2, col 2)
-        axes[1, 1].bar(weekly_df['Week Start'], weekly_df['Task Count'],
-                      color='#A23B72', alpha=0.8, width=5)
-        axes[1, 1].set_title('Weekly Task Count', fontsize=14, fontweight='bold')
-        axes[1, 1].set_xlabel('Week')
-        axes[1, 1].set_ylabel('Task Count')
-        axes[1, 1].tick_params(axis='x', rotation=45)
+                # Align data with all dates
+                y_values = []
+                for date in all_dates:
+                    if 'Date' in df.columns:
+                        matching = df[df['Date'] == date]
+                    elif 'Week Start' in df.columns:
+                        matching = df[df['Week Start'] == date]
+                    else:
+                        matching = df[df['Month Start'] == date]
 
-        # Monthly XP trend (row 3, col 1)
-        axes[2, 0].plot(monthly_df['Month Start'], monthly_df['Total XP'],
-                       marker='o', linewidth=4, markersize=8, color='#C73E1D')
-        axes[2, 0].set_title('Monthly XP Trend', fontsize=14, fontweight='bold')
-        axes[2, 0].set_xlabel('Month')
-        axes[2, 0].set_ylabel('XP')
-        axes[2, 0].tick_params(axis='x', rotation=45)
+                    if not matching.empty:
+                        y_values.append(matching[value_column].iloc[0])
+                    else:
+                        y_values.append(0)
 
-        # Monthly task count (row 3, col 2)
-        axes[2, 1].bar(monthly_df['Month Start'], monthly_df['Task Count'],
-                      color='#C73E1D', alpha=0.8, width=20)
-        axes[2, 1].set_title('Monthly Task Count', fontsize=14, fontweight='bold')
-        axes[2, 1].set_xlabel('Month')
-        axes[2, 1].set_ylabel('Task Count')
-        axes[2, 1].tick_params(axis='x', rotation=45)
+                # Plot stacked bars
+                positions = list(range(len(all_dates)))
+                ax.bar(positions, y_values, bottom=bottom_values, label=task_type,
+                      color=color, alpha=0.8, width=0.8)
+
+                # Update bottom values for next stack
+                for i in range(len(bottom_values)):
+                    bottom_values[i] += y_values[i]
+
+            # Format date labels
+            if all_dates and hasattr(all_dates[0], 'day'):
+                # Daily or monthly dates
+                date_labels = [d.strftime('%m/%d') if len(all_dates) <= 31 else d.strftime('%m/%y') for d in all_dates]
+            else:
+                # Weekly dates
+                date_labels = [d.strftime('%m/%d') for d in all_dates]
+
+            ax.set_xticks(positions)
+            ax.set_xticklabels(date_labels, rotation=45)
+
+            # Set labels and title
+            ax.set_xlabel(x_label)
+            ax.set_ylabel(y_label)
+            ax.set_title(title, fontsize=14, fontweight='bold')
+            ax.legend()
+            ax.grid(True, alpha=0.3)
+
+        # Daily XP by task type (row 1, col 1)
+        plot_stacked_bars(axes[0, 0], task_type_stats['daily'],
+                         'Daily XP by Task Type', 'Date', 'XP', 'Total XP')
+
+        # Daily task count by task type (row 1, col 2)
+        plot_stacked_bars(axes[0, 1], task_type_stats['daily'],
+                         'Daily Task Count by Task Type', 'Date', 'Task Count', 'Task Count')
+
+        # Weekly XP by task type (row 2, col 1)
+        plot_stacked_bars(axes[1, 0], task_type_stats['weekly'],
+                         'Weekly XP by Task Type', 'Week', 'XP', 'Total XP')
+
+        # Weekly task count by task type (row 2, col 2)
+        plot_stacked_bars(axes[1, 1], task_type_stats['weekly'],
+                         'Weekly Task Count by Task Type', 'Week', 'Task Count', 'Task Count')
+
+        # Monthly XP by task type (row 3, col 1)
+        plot_stacked_bars(axes[2, 0], task_type_stats['monthly'],
+                         'Monthly XP by Task Type', 'Month', 'XP', 'Total XP')
+
+        # Monthly task count by task type (row 3, col 2)
+        plot_stacked_bars(axes[2, 1], task_type_stats['monthly'],
+                         'Monthly Task Count by Task Type', 'Month', 'Task Count', 'Task Count')
 
         # Main title
-        fig.suptitle("Monthly, Weekly & Daily Learning Statistics Comparison",
+        fig.suptitle("Monthly, Weekly & Daily Learning Statistics by Task Type",
                     fontsize=18, fontweight='bold', y=0.98)
 
         # Adjust layout to prevent overlap
@@ -2681,6 +2725,86 @@ class ChartGenerator:
             'weekly': weekly_summary,
             'monthly': monthly_summary
         }
+
+    def _calculate_monthly_weekly_daily_stats_by_task_type(self) -> Dict[str, Dict[str, pd.DataFrame]]:
+        """Calculate monthly, weekly and daily XP statistics broken down by task type."""
+        if self.df.empty:
+            return {}
+
+        # Get unique task types
+        task_types = self.df['Task'].unique()
+        colors = {
+            'Lesson': '#2E86AB',
+            'Review': '#A23B72',
+            'Quiz': '#C73E1D',
+            'Multistep': '#F18F01',
+            'Placement': '#6A994E'
+        }
+
+        result = {
+            'daily': {},
+            'weekly': {},
+            'monthly': {}
+        }
+
+        # Daily stats by task type
+        for task_type in task_types:
+            task_data = self.df[self.df['Task'] == task_type]
+            if not task_data.empty:
+                daily_stats = task_data.groupby('date').agg({
+                    'xp_numeric': ['sum', 'count', 'mean']
+                }).reset_index()
+                daily_stats.columns = ['Date', 'Total XP', 'Task Count', 'Average XP']
+                result['daily'][task_type] = {
+                    'data': daily_stats,
+                    'color': colors.get(task_type, '#808080')
+                }
+
+        # Weekly stats by task type
+        for task_type in task_types:
+            task_data = self.df[self.df['Task'] == task_type].copy()
+            if not task_data.empty:
+                task_data['Week'] = task_data['date'].dt.isocalendar().week
+                task_data['Year'] = task_data['date'].dt.year
+
+                weekly_summary = task_data.groupby(['Year', 'Week']).agg({
+                    'xp_numeric': ['sum', 'count', 'mean']
+                }).reset_index()
+                weekly_summary.columns = ['Year', 'Week', 'Total XP', 'Task Count', 'Average XP']
+
+                # Create week start date (Monday of each week)
+                weekly_summary['Week Start'] = pd.to_datetime(
+                    weekly_summary['Year'].astype(str) + '-01-01'
+                ) + pd.to_timedelta((weekly_summary['Week'] - 1) * 7, unit='D')
+
+                result['weekly'][task_type] = {
+                    'data': weekly_summary,
+                    'color': colors.get(task_type, '#808080')
+                }
+
+        # Monthly stats by task type
+        for task_type in task_types:
+            task_data = self.df[self.df['Task'] == task_type].copy()
+            if not task_data.empty:
+                task_data['Month'] = task_data['date'].dt.month
+                task_data['Year'] = task_data['date'].dt.year
+
+                monthly_summary = task_data.groupby(['Year', 'Month']).agg({
+                    'xp_numeric': ['sum', 'count', 'mean']
+                }).reset_index()
+                monthly_summary.columns = ['Year', 'Month', 'Total XP', 'Task Count', 'Average XP']
+
+                # Create month start date
+                monthly_summary['Month Start'] = pd.to_datetime(
+                    monthly_summary['Year'].astype(str) + '-' + monthly_summary['Month'].astype(str).str.zfill(2) + '-01'
+                )
+
+                result['monthly'][task_type] = {
+                    'data': monthly_summary,
+                    'color': colors.get(task_type, '#808080')
+                }
+
+        return result
     
     def _calculate_efficiency_trend(self) -> pd.DataFrame:
         """Calculate learning efficiency trend (XP completion rate over time)."""
