@@ -357,43 +357,48 @@ class ChartGenerator:
         # Ensure we have a default color for unknown courses
         colors['Unknown'] = '#2E86AB'
 
-        # Create segments for different colors
+        # Create segments with careful boundary handling to avoid overlap
         if not colored_df.empty:
-            # Split the data into segments where the dominant course changes
+            fig = go.Figure()
+
+            # Find segments where the dominant course changes
             segments = []
             current_course = colored_df.iloc[0]['dominant_course']
             start_idx = 0
 
             for i in range(1, len(colored_df)):
                 if colored_df.iloc[i]['dominant_course'] != current_course:
-                    # Create a segment from start_idx to i-1
+                    # Create a segment from start_idx to i-1 (exclude boundary point to avoid overlap)
                     segment = colored_df.iloc[start_idx:i]
-                    segments.append((segment, current_course))
+                    if not segment.empty:
+                        segments.append((segment, current_course))
                     current_course = colored_df.iloc[i]['dominant_course']
                     start_idx = i
 
             # Add the last segment
             segment = colored_df.iloc[start_idx:]
-            segments.append((segment, current_course))
+            if not segment.empty:
+                segments.append((segment, current_course))
 
-            # Add each segment as a separate trace
-            for segment, course in segments:
+            # Add each segment with its course color
+            for idx, (segment, course) in enumerate(segments):
                 color = colors.get(course, colors['Unknown'])
 
-                # Create custom hover text for each data point (date shown by x unified mode)
-                hover_text = [f'Cumulative XP: {cum_xp}<br>Daily XP: {daily_xp}<br>Main Course: {course}'
+                # Create hover text for each data point
+                hover_text = [f'Date: {date.strftime("%Y-%m-%d")}<br>Cumulative XP: {cum_xp}<br>Daily XP: {daily_xp}<br>Main Course: {course}'
                               for date, cum_xp, daily_xp in zip(segment['date'], segment['cumulative_xp'], segment['xp_numeric'])]
 
                 fig.add_trace(go.Scatter(
                     x=segment['date'],
                     y=segment['cumulative_xp'],
                     mode='lines+markers',
-                    name=f'Cumulative XP ({course})',
+                    name=course,
                     line=dict(color=color, width=3),
-                    marker=dict(size=6),
+                    marker=dict(size=6, color=color),
                     hovertext=hover_text,
                     hovertemplate='%{hovertext}<extra></extra>',
-                    showlegend=False
+                    showlegend=False,
+                    hoverinfo='text'
                 ))
 
         # Create a custom legend showing course colors in appearance order
@@ -411,7 +416,7 @@ class ChartGenerator:
             title="Cumulative XP Progress",
             xaxis_title="Date",
             yaxis_title="Cumulative XP",
-            hovermode='x unified',
+            hovermode='x',  # Back to x-axis based hover
             template='plotly_white',
             showlegend=True,
             height=650,  # Increased height to accommodate legend
