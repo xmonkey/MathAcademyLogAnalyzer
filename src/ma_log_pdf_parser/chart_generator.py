@@ -786,8 +786,18 @@ class ChartGenerator:
         legend_elements.append(plt.Line2D([0], [0], color='#F18F01', linewidth=2, label='7-Day Average'))
 
         if legend_elements:
-            # Place legend inside the plot area in the upper left
-            plt.legend(handles=legend_elements, loc='upper left', framealpha=0.95,
+            # Check if left area has high bars that would overlap with legend
+            left_quarter_date = df['date'].min() + pd.Timedelta(days=len(df) // 4)
+            max_left_xp = df[df['date'] <= left_quarter_date]['xp_numeric'].max()
+            overall_max_xp = df['xp_numeric'].max()
+
+            # Dynamically choose legend position based on data distribution
+            if max_left_xp > overall_max_xp * 0.6:  # If left has tall bars, place legend on right
+                legend_loc = 'upper right'
+            else:
+                legend_loc = 'upper left'
+
+            plt.legend(handles=legend_elements, loc=legend_loc, framealpha=0.95,
                       fancybox=True, shadow=True, fontsize=9)
 
         # Adjust layout to make room for data
