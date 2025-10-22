@@ -146,9 +146,10 @@ cython_debug/
 output/
 *.xlsx
 *.json
-*.png
 *.html
 *.txt
+# Allow PNG files in screenshot_and_samples directory
+!screenshot_and_samples/*.png
 !README.md
 !README_CN.md
 !CLAUDE.md
