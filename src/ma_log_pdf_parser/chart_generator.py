@@ -1836,6 +1836,7 @@ class ChartGenerator:
                     margin-bottom: 15px;
                     border-bottom: 2px solid #667eea;
                     padding-bottom: 10px;
+                    text-align: left;
                 }}
                 .heatmap-wrapper {{
                     overflow-x: auto;
