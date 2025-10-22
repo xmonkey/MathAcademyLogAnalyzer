@@ -1681,7 +1681,6 @@ class ChartGenerator:
 
         # Create histogram bars
         bars = ax.bar(df['Range Label'], df['Day Count'], color='#2E86AB', alpha=0.8)
-        ax.set_title('Daily XP Distribution')
         ax.set_ylabel('Number of Days')
         ax.set_xlabel('Daily XP Range')
         ax.tick_params(axis='x', rotation=45)
@@ -1693,40 +1692,20 @@ class ChartGenerator:
             ax.text(bar.get_x() + bar.get_width()/2., height,
                    f'{int(height)}', ha='center', va='bottom')
 
-        # Find which XP range contains the mean and median, then add annotations
-        mean_range_idx = self._find_xp_range_for_value(stats['mean_daily_xp'], df)
-        median_range_idx = self._find_xp_range_for_value(stats['median_daily_xp'], df)
+        # Removed Mean and Median annotations to keep the chart clean
 
-        # Add annotations for mean and median
-        if mean_range_idx is not None:
-            mean_count = df.loc[mean_range_idx, 'Day Count']
-            ax.annotate(f'Mean: {stats["mean_daily_xp"]:.1f}',
-                       xy=(mean_range_idx, mean_count),
-                       xytext=(mean_range_idx, mean_count * 1.3),
-                       ha='center',
-                       arrowprops=dict(arrowstyle='->', color='red', lw=2),
-                       bbox=dict(boxstyle='round,pad=0.3', facecolor='white', edgecolor='red'),
-                       fontsize=10, color='red', fontweight='bold')
+        # Main title with statistics in smaller font
+        fig.suptitle("Daily XP Distribution", fontsize=14, fontweight='bold', y=0.98)
 
-        if median_range_idx is not None:
-            median_count = df.loc[median_range_idx, 'Day Count']
-            ax.annotate(f'Median: {stats["median_daily_xp"]:.1f}',
-                       xy=(median_range_idx, median_count),
-                       xytext=(median_range_idx, median_count * 1.5),
-                       ha='center',
-                       arrowprops=dict(arrowstyle='->', color='orange', lw=2),
-                       bbox=dict(boxstyle='round,pad=0.3', facecolor='white', edgecolor='orange'),
-                       fontsize=10, color='orange', fontweight='bold')
+        # Add statistics subtitle with smaller font
+        fig.text(0.5, 0.92,
+                f"Mean: {stats['mean_daily_xp']:.1f} XP, Median: {stats['median_daily_xp']:.1f} XP, "
+                f"Range: {stats['min_daily_xp']:.0f}-{stats['max_daily_xp']:.0f} XP",
+                ha='center', va='top', fontsize=10, style='italic')
 
-        # Main title with statistics
-        fig.suptitle(f"Daily XP Distribution\n"
-                    f"Mean: {stats['mean_daily_xp']:.1f} XP, Median: {stats['median_daily_xp']:.1f} XP, "
-                    f"Range: {stats['min_daily_xp']:.0f}-{stats['max_daily_xp']:.0f} XP",
-                    fontsize=14, fontweight='bold')
-
-        # Adjust layout to make room for annotations
+        # Adjust layout - need more space for longer title
         plt.tight_layout()
-        plt.subplots_adjust(top=0.85)  # Make room for suptitle
+        plt.subplots_adjust(top=0.85)
 
         # Save as PNG
         output_file = f"{output_path}.png"
