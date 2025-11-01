@@ -127,6 +127,129 @@ class ChartGenerator:
 
         return daily_data
 
+    def _calculate_optimal_legend_position(self, df: pd.DataFrame) -> dict:
+        """Calculate optimal legend position using four-quadrant analysis.
+
+        Args:
+            df: Daily XP DataFrame
+
+        Returns:
+            Dictionary with legend configuration
+        """
+        if df.empty:
+            # Default fallback position
+            return {
+                'margin': dict(t=120, b=80, l=80, r=120),
+                'x': 0.99, 'xanchor': 'right',
+                'y': 0.99, 'yanchor': 'top',
+                'orientation': 'v'
+            }
+
+        overall_max_xp = df['xp_numeric'].max()
+
+        # Divide data into four quadrants
+        quarter_point = len(df) // 4
+        half_point = len(df) // 2
+
+        # Quadrant 1: Left-top (first 25% of dates)
+        left_top_max = df.iloc[:quarter_point]['xp_numeric'].max() if quarter_point > 0 else 0
+
+        # Quadrant 2: Right-top (last 25% of dates)
+        right_top_max = df.iloc[-quarter_point:]['xp_numeric'].max() if quarter_point > 0 else 0
+
+        # Quadrant 3: Left-bottom (second 25% of dates)
+        left_bottom_max = df.iloc[quarter_point:half_point]['xp_numeric'].max() if half_point > quarter_point else 0
+
+        # Quadrant 4: Right-bottom (third 25% of dates)
+        right_bottom_max = df.iloc[half_point:half_point+quarter_point]['xp_numeric'].max() if half_point+quarter_point < len(df) else 0
+
+        # Calculate quadrant densities (percentage of max XP)
+        thresholds = [0.6, 0.5, 0.4, 0.3]  # Different threshold levels
+
+        for threshold in thresholds:
+            # Find best quadrant with low data density
+            quadrant_scores = {
+                'left-top': left_top_max / overall_max_xp if overall_max_xp > 0 else 0,
+                'right-top': right_top_max / overall_max_xp if overall_max_xp > 0 else 0,
+                'left-bottom': left_bottom_max / overall_max_xp if overall_max_xp > 0 else 0,
+                'right-bottom': right_bottom_max / overall_max_xp if overall_max_xp > 0 else 0
+            }
+
+            # Find quadrant with lowest score (least data)
+            best_quadrant = min(quadrant_scores, key=quadrant_scores.get)
+
+            if quadrant_scores[best_quadrant] <= threshold:
+                break  # Found a good position
+
+        # If all quadrants have high data (>60% of max), consider horizontal layout
+        if quadrant_scores[best_quadrant] > 0.6:
+            return self._get_horizontal_legend_config(df)
+
+        # Map quadrant to legend position
+        quadrant_configs = {
+            'left-top': {
+                'margin': dict(t=120, b=80, l=120, r=80),
+                'x': 0.02, 'xanchor': 'left',
+                'y': 0.99, 'yanchor': 'top',
+                'orientation': 'v'
+            },
+            'right-top': {
+                'margin': dict(t=120, b=80, l=80, r=120),
+                'x': 0.99, 'xanchor': 'right',
+                'y': 0.99, 'yanchor': 'top',
+                'orientation': 'v'
+            },
+            'left-bottom': {
+                'margin': dict(t=80, b=120, l=120, r=80),
+                'x': 0.02, 'xanchor': 'left',
+                'y': 0.01, 'yanchor': 'bottom',
+                'orientation': 'v'
+            },
+            'right-bottom': {
+                'margin': dict(t=80, b=120, l=80, r=120),
+                'x': 0.99, 'xanchor': 'right',
+                'y': 0.01, 'yanchor': 'bottom',
+                'orientation': 'v'
+            }
+        }
+
+        return quadrant_configs[best_quadrant]
+
+    def _get_horizontal_legend_config(self, df: pd.DataFrame) -> dict:
+        """Get configuration for horizontal legend layout.
+
+        Args:
+            df: Daily XP DataFrame
+
+        Returns:
+            Dictionary with horizontal legend configuration
+        """
+        # Check if there's more space at top or bottom
+        mid_point = len(df) // 2
+        top_half_max = df.iloc[:mid_point]['xp_numeric'].max() if mid_point > 0 else 0
+        bottom_half_max = df.iloc[mid_point:]['xp_numeric'].max() if mid_point < len(df) else 0
+
+        overall_max = df['xp_numeric'].max()
+        top_density = top_half_max / overall_max if overall_max > 0 else 0
+        bottom_density = bottom_half_max / overall_max if overall_max > 0 else 0
+
+        if top_density <= bottom_density:
+            # Place legend at top
+            return {
+                'margin': dict(t=150, b=80, l=80, r=80),  # Extra top margin
+                'x': 0.5, 'xanchor': 'center',
+                'y': 1.02, 'yanchor': 'bottom',
+                'orientation': 'h'
+            }
+        else:
+            # Place legend at bottom
+            return {
+                'margin': dict(t=80, b=150, l=80, r=80),  # Extra bottom margin
+                'x': 0.5, 'xanchor': 'center',
+                'y': -0.02, 'yanchor': 'top',
+                'orientation': 'h'
+            }
+
     def _get_course_appearance_order(self) -> List[str]:
         """Get courses in the order they first appear in the data."""
         if self.df.empty:
@@ -656,7 +779,18 @@ class ChartGenerator:
                 legend_name = f"{course} ({course_total:,} XP)"
                 legend_items.append(f'<span style="color:{color}">●</span> {legend_name}')
 
-        # Update layout
+        # **ADVANCED DYNAMIC LEGEND POSITION**: Four-quadrant analysis for optimal placement
+        legend_config = self._calculate_optimal_legend_position(df)
+
+        # **DYNAMIC MARGINS**: Adjust margins based on legend position
+        margin_config = legend_config['margin']
+        legend_x = legend_config['x']
+        legend_xanchor = legend_config['xanchor']
+        legend_orientation = legend_config['orientation']
+        legend_y = legend_config['y']
+        legend_yanchor = legend_config['yanchor']
+
+        # Update layout with dynamic configuration
         fig.update_layout(
             title="Daily XP Trend by Course",
             xaxis_title="Date",
@@ -664,27 +798,30 @@ class ChartGenerator:
             hovermode='x unified',
             template='plotly_white',
             showlegend=True,
-            height=650,  # Increased height to accommodate legend
-            margin=dict(t=100, b=50, l=50, r=50),  # Add more top margin for legend
+            height=750,  # **INCREASED HEIGHT** from 650 to 750 for better visibility
+            margin=margin_config,  # **DYNAMIC MARGINS** based on legend position
             xaxis=dict(
                 tickformat='%Y-%m-%d',
                 tickangle=45
             ),
             yaxis=dict(
                 title="Daily XP",
-                tickformat=',.0f'
+                tickformat=',.0f',
+                autorange=True,  # **AUTO-ADJUST Y-AXIS** to ensure space for legend
+                rangemode="tozero"  # Ensure Y-axis starts from 0
             ),
             legend=dict(
                 title="Course (Total XP)",
-                orientation="v",
-                yanchor="top",
-                y=0.99,
-                xanchor="right",
-                x=0.99,
+                orientation=legend_orientation,  # **DYNAMIC ORIENTATION**
+                yanchor=legend_yanchor,
+                y=legend_y,
+                xanchor=legend_xanchor,
+                x=legend_x,
                 bgcolor="rgba(255,255,255,0.9)",
                 bordercolor="#CCCCCC",
                 borderwidth=1,
-                tracegroupgap=5
+                tracegroupgap=8,
+                font=dict(size=10)
             )
         )
 
@@ -786,24 +923,27 @@ class ChartGenerator:
         legend_elements.append(plt.Line2D([0], [0], color='#F18F01', linewidth=2, label='7-Day Average'))
 
         if legend_elements:
-            # Check if left area has high bars that would overlap with legend
-            left_quarter_date = df['date'].min() + pd.Timedelta(days=len(df) // 4)
-            max_left_xp = df[df['date'] <= left_quarter_date]['xp_numeric'].max()
+            # **IMPROVED DYNAMIC LEGEND POSITION**: Check if right area has high bars (consistent with interactive version)
+            right_quarter_date = df['date'].max() - pd.Timedelta(days=len(df) // 4)
+            max_right_xp = df[df['date'] >= right_quarter_date]['xp_numeric'].max() if not df[df['date'] >= right_quarter_date].empty else 0
             overall_max_xp = df['xp_numeric'].max()
 
-            # Dynamically choose legend position based on data distribution
-            if max_left_xp > overall_max_xp * 0.6:  # If left has tall bars, place legend on right
-                legend_loc = 'upper right'
-            else:
+            # **DYNAMIC POSITION**: If right side has high values (>70% of max), place legend on left
+            if max_right_xp > overall_max_xp * 0.7:
                 legend_loc = 'upper left'
+                # Adjust subplot for left legend
+                plt.subplots_adjust(left=0.2, right=0.95, top=0.9, bottom=0.15)
+            else:
+                legend_loc = 'upper right'
+                # Adjust subplot for right legend
+                plt.subplots_adjust(left=0.1, right=0.85, top=0.9, bottom=0.15)
 
             plt.legend(handles=legend_elements, loc=legend_loc, framealpha=0.95,
                       fancybox=True, shadow=True, fontsize=9)
-
-        # Adjust layout to make room for data
-        plt.tight_layout()
-        # Adjust left margin slightly to accommodate legend
-        plt.subplots_adjust(left=0.15)
+        else:
+            # Default layout adjustment when no legend
+            plt.tight_layout()
+            plt.subplots_adjust(top=0.9, bottom=0.15)
 
         # Save as PNG
         output_file = f"{output_path}.png"
