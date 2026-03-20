@@ -2437,8 +2437,20 @@ class ChartGenerator:
         stat_cards = []
 
         # Performance stats cards (gradient background)
-        longest_subtext = f"<div style='font-size: 0.8em; opacity: 0.8; margin-top: 5px;'>{longest_range}</div>" if longest_range else ""
-        current_subtext = f"<div style='font-size: 0.8em; opacity: 0.8; margin-top: 5px;'>{current_range}</div>" if current_range else ""
+        longest_xp = longest_streak.get('total_xp', 0)
+        current_xp = current_streak.get('total_xp', 0)
+
+        longest_subtext = ""
+        if longest_range and longest_xp > 0:
+            longest_subtext = f"<div style='font-size: 0.8em; opacity: 0.8; margin-top: 5px;'>{longest_range}</div><div style='font-size: 0.75em; opacity: 0.7; margin-top: 3px;'>{longest_xp:,} XP</div>"
+        elif longest_range:
+            longest_subtext = f"<div style='font-size: 0.8em; opacity: 0.8; margin-top: 5px;'>{longest_range}</div>"
+
+        current_subtext = ""
+        if current_range and current_xp > 0:
+            current_subtext = f"<div style='font-size: 0.8em; opacity: 0.8; margin-top: 5px;'>{current_range}</div><div style='font-size: 0.75em; opacity: 0.7; margin-top: 3px;'>{current_xp:,} XP</div>"
+        elif current_range:
+            current_subtext = f"<div style='font-size: 0.8em; opacity: 0.8; margin-top: 5px;'>{current_range}</div>"
 
         stat_cards.extend([
             f'<div class="stat-card">'
@@ -2789,10 +2801,10 @@ class ChartGenerator:
             daily_df: DataFrame containing daily XP data
 
         Returns:
-            Dictionary containing streak length and date range
+            Dictionary containing streak length, date range, and total XP earned during streak
         """
         if self.df.empty:
-            return {'length': 0, 'start_date': None, 'end_date': None}
+            return {'length': 0, 'start_date': None, 'end_date': None, 'total_xp': 0}
 
         # Get the date range from the data
         min_date = self.df['date'].min().date()
@@ -2806,47 +2818,61 @@ class ChartGenerator:
         daily_activity_count.columns = ['date', 'activity_count']
         daily_activity_count['date'] = pd.to_datetime(daily_activity_count['date'])
 
-        # Create a dictionary for quick lookup of activity counts
+        # Calculate daily XP for lookup
+        daily_xp_sum = self.df.groupby(self.df['date'].dt.date)['xp_numeric'].sum().reset_index()
+        daily_xp_sum.columns = ['date', 'daily_xp']
+        daily_xp_sum['date'] = pd.to_datetime(daily_xp_sum['date'])
+
+        # Create dictionaries for quick lookup
         activity_dict = dict(zip(daily_activity_count['date'].dt.date, daily_activity_count['activity_count']))
+        xp_dict = dict(zip(daily_xp_sum['date'].dt.date, daily_xp_sum['daily_xp']))
 
         # Calculate consecutive streaks across all calendar days
         max_streak = 0
         current_streak = 0
         current_streak_start = None
+        current_streak_xp = 0
         max_streak_start = None
         max_streak_end = None
+        max_streak_xp = 0
 
         for date in date_range:
             date_key = date.date()
             has_activity = activity_dict.get(date_key, 0) > 0
+            day_xp = xp_dict.get(date_key, 0)
 
             if has_activity:
                 if current_streak == 0:
                     current_streak_start = date_key
+                    current_streak_xp = 0
                 current_streak += 1
+                current_streak_xp += day_xp
 
                 if current_streak > max_streak:
                     max_streak = current_streak
                     max_streak_start = current_streak_start
                     max_streak_end = date_key
+                    max_streak_xp = current_streak_xp
             else:
                 current_streak = 0
                 current_streak_start = None
+                current_streak_xp = 0
 
         return {
             'length': max_streak,
             'start_date': max_streak_start.isoformat() if max_streak_start else None,
-            'end_date': max_streak_end.isoformat() if max_streak_end else None
+            'end_date': max_streak_end.isoformat() if max_streak_end else None,
+            'total_xp': int(max_streak_xp)
         }
 
     def _calculate_current_streak(self) -> Dict[str, Any]:
         """Calculate the current consecutive days with study activity ending on the last day of records.
 
         Returns:
-            Dictionary containing current streak length and date range
+            Dictionary containing current streak length, date range, and total XP earned during streak
         """
         if self.df.empty:
-            return {'length': 0, 'start_date': None, 'end_date': None}
+            return {'length': 0, 'start_date': None, 'end_date': None, 'total_xp': 0}
 
         # Get the date range from the data
         min_date = self.df['date'].min().date()
@@ -2860,22 +2886,32 @@ class ChartGenerator:
         daily_activity_count.columns = ['date', 'activity_count']
         daily_activity_count['date'] = pd.to_datetime(daily_activity_count['date'])
 
-        # Create a dictionary for quick lookup of activity counts
+        # Calculate daily XP for lookup
+        daily_xp_sum = self.df.groupby(self.df['date'].dt.date)['xp_numeric'].sum().reset_index()
+        daily_xp_sum.columns = ['date', 'daily_xp']
+        daily_xp_sum['date'] = pd.to_datetime(daily_xp_sum['date'])
+
+        # Create dictionaries for quick lookup
         activity_dict = dict(zip(daily_activity_count['date'].dt.date, daily_activity_count['activity_count']))
+        xp_dict = dict(zip(daily_xp_sum['date'].dt.date, daily_xp_sum['daily_xp']))
 
         # Calculate current streak by iterating backwards from the last day
         current_streak = 0
         current_streak_end = max_date  # The last day of records
         current_streak_start = None
+        current_streak_xp = 0
 
         # Start from the last day and go backwards
         for date in reversed(date_range):
             date_key = date.date()
             has_activity = activity_dict.get(date_key, 0) > 0
+            day_xp = xp_dict.get(date_key, 0)
 
             if has_activity:
                 current_streak += 1
-                current_streak_start = date_key
+                if current_streak_start is None:
+                    current_streak_start = date_key
+                current_streak_xp += day_xp
             else:
                 # Stop as soon as we hit a day without activity
                 break
@@ -2883,7 +2919,8 @@ class ChartGenerator:
         return {
             'length': current_streak,
             'start_date': current_streak_start.isoformat() if current_streak_start else None,
-            'end_date': current_streak_end.isoformat() if current_streak_end else None
+            'end_date': current_streak_end.isoformat() if current_streak_end else None,
+            'total_xp': int(current_streak_xp)
         }
 
     def _calculate_recent_trend(self, daily_df: pd.DataFrame) -> Dict[str, float]:

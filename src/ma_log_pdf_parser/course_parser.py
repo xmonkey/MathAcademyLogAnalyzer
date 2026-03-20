@@ -19,83 +19,132 @@ class CourseProgressParser:
         self.pdf_parser = PDFParser(pdf_path)
 
     def parse_course_data(self) -> List[Dict[str, Any]]:
-        """Parse course progress data from PDF with improved logic."""
+        """Parse course progress data from PDF with improved multiline description handling."""
         text_content = self.pdf_parser.extract_text()
-        
+
         # Split content by lines for processing
         lines = text_content.split('\n')
-        
+
         course_data = []
         current_date = None
         daily_total = None
-        
+        prefix_lines = []  # Store lines that come before the main data line
+
         # Improved regex patterns
         date_pattern = r'(\w+),\s+(\w+)\s+(\d{1,2})(?:st|nd|rd|th)?,\s+(\d{4})\s+\((\d+)\s+XP\)'
         # Regular task pattern (e.g., "4th Grade Math Quiz Quiz 1 18/15 XP")
-        regular_task_pattern = r'(.+?)\s+(Quiz|Lesson|Review|Multistep)\s+(.+?)\s+(\d+)/(\d+)\s+XP'
+        # The description part is optional - can be "18/18 XP" or "Some Description 18/18 XP"
+        regular_task_pattern = r'^(.+?)\s+(Quiz|Lesson|Review|Multistep)\s+(.+)$'
         # Placement task pattern (e.g., "4th Grade Math Placement 35/ XP")
-        placement_task_pattern = r'(.+?)\s+(Placement)\s+(\d+)/\s+XP'
-        
-        for line in lines:
-            line = line.strip()
-            
+        placement_task_pattern = r'^(.+?)\s+(Placement)\s+(\d+)/\s+XP$'
+
+        i = 0
+        while i < len(lines):
+            line = lines[i].strip()
+
             if not line:
+                i += 1
                 continue
-            
+
             # Match date line with daily total
             date_match = re.search(date_pattern, line)
             if date_match:
                 weekday, month, day, year, total_xp = date_match.groups()
                 current_date = f"{year}-{self._month_to_num(month)}-{int(day):02d}"
                 daily_total = int(total_xp)
+                prefix_lines = []  # Reset prefix lines on new date
+                i += 1
                 continue
-            
+
             # Skip header lines and student info
-            if (line.startswith('Activity Log') or 
-                'Student ID:' in line or 
-                'Start Date:' in line or 
+            if (line.startswith('Activity Log') or
+                'Student ID:' in line or
+                'Start Date:' in line or
                 'End Date:' in line or
                 line == 'COURSE TASK DESCRIPTION XP EARNED'):
+                i += 1
                 continue
-            
-            # Match regular course task lines
+
+            # Try to match as a regular task line
             regular_match = re.search(regular_task_pattern, line)
             if regular_match and current_date:
-                course_full, task_type, description, earned, possible = regular_match.groups()
+                # Extract course name and description differently
+                # Find where the task type is and split accordingly
+                task_pattern = r'^(.+?)\s+(Quiz|Lesson|Review|Multistep)\s+(.+)$'
+                task_match = re.search(task_pattern, line)
+                if task_match:
+                    course_part = task_match.group(1).strip()
+                    task_type = task_match.group(2)
+                    desc_with_xp = task_match.group(3)
 
-                # Use course name directly from PDF (already properly formatted)
-                course = course_full
-                
-                # Use task_type directly for Task
-                task_name = task_type.capitalize()
-                
-                course_data.append({
-                    'Date': current_date,
-                    'Course': course,
-                    'Task': task_name,
-                    'Description': description.strip(),
-                    'XP Earned': int(earned),
-                    'XP Possible': int(possible),
-                    'XP Detail': f"{earned}/{possible}",
-                    'Daily Total XP': daily_total
-                })
-                continue
-            
-            # Match placement task lines
+                    # Extract XP from the end
+                    # Pattern might be "18/18 XP" or "Some Description 18/18 XP"
+                    xp_pattern = r'^(.*?)?(\d+)/(\d+)\s+XP$'
+                    xp_match = re.search(xp_pattern, desc_with_xp)
+                    if xp_match:
+                        description = (xp_match.group(1) or '').strip()
+                        earned = xp_match.group(2)
+                        possible = xp_match.group(3)
+
+                        # Combine with prefix lines if any
+                        if prefix_lines:
+                            full_description = ' '.join(prefix_lines) + ' ' + description
+                            full_description = ' '.join(full_description.split())  # Normalize spaces
+                        else:
+                            full_description = description
+
+                        # Check if the next line is a continuation (after the XP line)
+                        # Look ahead to see if there's a continuation line
+                        continuation_lines = []
+                        j = i + 1
+                        while j < len(lines):
+                            next_line = lines[j].strip()
+                            # Stop if we hit a new date, empty line, or another XP line
+                            if (not next_line or
+                                re.search(date_pattern, next_line) or
+                                next_line == 'COURSE TASK DESCRIPTION XP EARNED' or
+                                re.search(r'\d+/\d+\s+XP', next_line) or
+                                re.search(r'\d+/\s+XP', next_line)):
+                                break
+                            # Check if it looks like text content
+                            if re.search(r'[a-zA-Z]{3,}', next_line):
+                                continuation_lines.append(next_line)
+                                j += 1
+                            else:
+                                break
+
+                        # Add continuation lines to description
+                        if continuation_lines:
+                            full_description = full_description + ' ' + ' '.join(continuation_lines)
+                            full_description = ' '.join(full_description.split())  # Normalize spaces
+                            i = j - 1  # Skip the continuation lines we processed
+
+                        course_data.append({
+                            'Date': current_date,
+                            'Course': course_part,
+                            'Task': task_type.capitalize(),
+                            'Description': full_description,
+                            'XP Earned': int(earned),
+                            'XP Possible': int(possible),
+                            'XP Detail': f"{earned}/{possible}",
+                            'Daily Total XP': daily_total
+                        })
+                        prefix_lines = []
+                        i += 1
+                        continue
+
+            # Try to match as a placement task line
             placement_match = re.search(placement_task_pattern, line)
             if placement_match and current_date:
                 course_full, task_type, earned = placement_match.groups()
 
-                # Use course name directly from PDF (already properly formatted)
-                course = course_full
-                
                 # For placement tasks, the XP possible is the same as earned (no slash)
                 xp_earned = int(earned)
                 xp_possible = xp_earned
-                
+
                 course_data.append({
                     'Date': current_date,
-                    'Course': course,
+                    'Course': course_full.strip(),
                     'Task': 'Placement',
                     'Description': 'Placement Test',
                     'XP Earned': xp_earned,
@@ -103,7 +152,24 @@ class CourseProgressParser:
                     'XP Detail': f"{xp_earned}/",
                     'Daily Total XP': daily_total
                 })
-        
+                prefix_lines = []
+                i += 1
+                continue
+
+            # If line doesn't match any pattern and isn't a header/date,
+            # it might be a continuation line (part of description)
+            # Check if it looks like text content (has letters but no XP pattern)
+            if line and not re.search(r'\d+/\d+\s+XP', line) and not re.search(r'\d+/\s+XP', line):
+                # Check if it looks like a text line (has letters)
+                if re.search(r'[a-zA-Z]{3,}', line):
+                    prefix_lines.append(line)
+                    i += 1
+                    continue
+
+            # If we get here, clear prefix lines and move on
+            prefix_lines = []
+            i += 1
+
         return course_data
 
     def export_to_excel(self, output_path: str, data: Optional[List[Dict[str, Any]]] = None):
