@@ -2909,8 +2909,9 @@ class ChartGenerator:
 
             if has_activity:
                 current_streak += 1
-                if current_streak_start is None:
-                    current_streak_start = date_key
+                # Always update start date when going backwards
+                # The last update will be the earliest date in the streak
+                current_streak_start = date_key
                 current_streak_xp += day_xp
             else:
                 # Stop as soon as we hit a day without activity
