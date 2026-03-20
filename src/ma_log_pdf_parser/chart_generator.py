@@ -3227,9 +3227,19 @@ class ChartGenerator:
         if self.df.empty:
             return {}
 
-        # Calculate daily XP totals
-        daily_xp = self.df.groupby('date')['xp_numeric'].sum().reset_index()
-        daily_xp.columns = ['date', 'daily_xp']
+        # Calculate daily XP totals AND activity count
+        # Use activity count to determine if there was any activity (even if XP is 0)
+        daily_stats = self.df.groupby('date').agg({
+            'xp_numeric': 'sum',
+        }).reset_index()
+        daily_stats.columns = ['date', 'daily_xp']
+
+        # Count activities per day separately
+        activity_counts = self.df.groupby('date').size().reset_index()
+        activity_counts.columns = ['date', 'activity_count']
+
+        # Merge the two
+        daily_stats = pd.merge(daily_stats, activity_counts, on='date', how='left')
 
         # Get the last day from the data and create a 1-year range
         max_date = self.df['date'].max().date()
@@ -3241,22 +3251,28 @@ class ChartGenerator:
         # Create a complete dataframe with all dates
         full_df = pd.DataFrame({'date': date_range})
 
-        # Merge with daily XP data
-        heatmap_df = pd.merge(full_df, daily_xp, on='date', how='left')
+        # Merge with daily stats data
+        heatmap_df = pd.merge(full_df, daily_stats, on='date', how='left')
         heatmap_df['daily_xp'] = heatmap_df['daily_xp'].fillna(0)
+        heatmap_df['activity_count'] = heatmap_df['activity_count'].fillna(0).astype(int)
 
-        # Determine color levels based on XP thresholds
-        def get_color_level(xp):
-            if xp == 0:
+        # Determine color levels based on activity and XP thresholds
+        def get_color_level(row):
+            # First check if there was any activity (even with 0 XP)
+            if row['activity_count'] == 0:
                 return 0  # No activity - gray
-            elif xp < 15:
+            # Has activity but 0 or negative XP
+            elif row['daily_xp'] <= 0:
+                return 1  # Activity but no XP earned - light green
+            # Has activity and positive XP
+            elif row['daily_xp'] < 15:
                 return 1  # Light green
-            elif xp < 30:
+            elif row['daily_xp'] < 30:
                 return 2  # Medium green
             else:
                 return 3  # Dark green
 
-        heatmap_df['color_level'] = heatmap_df['daily_xp'].apply(get_color_level)
+        heatmap_df['color_level'] = heatmap_df.apply(get_color_level, axis=1)
 
         # Add GitHub-style week and day information (Sunday-starting weeks)
         heatmap_df['weekday_num'] = heatmap_df['date'].dt.weekday  # Monday=0, Sunday=6
@@ -3287,14 +3303,14 @@ class ChartGenerator:
         heatmap_df['month_name'] = heatmap_df['date'].dt.strftime('%b')
         heatmap_df['day'] = heatmap_df['date'].dt.day
 
-        # Calculate statistics
-        total_active_days = (heatmap_df['daily_xp'] > 0).sum()
+        # Calculate statistics (based on activity count, not just XP)
+        total_active_days = (heatmap_df['activity_count'] > 0).sum()
         total_days = len(heatmap_df)
 
         # Calculate current streak (from the end)
         current_streak = 0
         for i in range(len(heatmap_df) - 1, -1, -1):
-            if heatmap_df.iloc[i]['daily_xp'] > 0:
+            if heatmap_df.iloc[i]['activity_count'] > 0:
                 current_streak += 1
             else:
                 break
@@ -3310,11 +3326,11 @@ class ChartGenerator:
                 'total_days': int(total_days),
                 'current_streak': int(current_streak),
                 'max_daily_xp': int(heatmap_df['daily_xp'].max()),
-                'average_xp': float(heatmap_df[heatmap_df['daily_xp'] > 0]['daily_xp'].mean()) if total_active_days > 0 else 0
+                'average_xp': float(heatmap_df[heatmap_df['activity_count'] > 0]['daily_xp'].mean()) if total_active_days > 0 else 0
             },
             'color_levels': {
                 '0': '#ebedf0',  # Gray - no activity
-                '1': '#9be9a8',  # Light green - XP < 15
+                '1': '#9be9a8',  # Light green - has activity but XP <= 0 or XP < 15
                 '2': '#40c463',  # Medium green - 15 <= XP < 30
                 '3': '#30a14e'   # Dark green - XP >= 30
             }
