@@ -126,6 +126,10 @@ For different approaches to Math Academy data analysis with alternative data sou
 
 **[rahimnathwani/mathacademy-stats](https://github.com/rahimnathwani/mathacademy-stats)** - Alternative Math Academy statistics and analysis tools
 
+https://github.com/wdanxna/MathacademyTracker https://x.com/wdanxna/status/1999319115803296255 This extension automatically tracks your learning statistics into your Google Sheet, and added a button lets you screenshot a section conveniently so you can paste into your Anki card.
+
+https://github.com/thaske/ma-grid MA Grid is a web extension that displays a GitHub-style activity graph on Math Academy.
+
 ---
 
 *Documentation optimized with Claude Code*
