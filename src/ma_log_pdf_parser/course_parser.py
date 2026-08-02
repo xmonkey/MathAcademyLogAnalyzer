@@ -2,8 +2,9 @@
 
 import re
 import json
+import pdfplumber
 import pandas as pd
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime
 import openpyxl
 from openpyxl.styles import Font, Alignment, PatternFill
@@ -18,11 +19,174 @@ class CourseProgressParser:
         """Initialize the course progress parser."""
         self.pdf_parser = PDFParser(pdf_path)
 
-    def parse_course_data(self) -> List[Dict[str, Any]]:
-        """Parse course progress data from PDF with improved multiline description handling."""
-        text_content = self.pdf_parser.extract_text()
+    # Known task types; rows whose Task column isn't one of these are skipped.
+    _TASK_TYPES = ('Quiz', 'Lesson', 'Review', 'Multistep', 'Placement')
 
-        # Split content by lines for processing
+    # Date line pattern, e.g. "Wed, Jul 8th, 2026 (71 XP)"
+    _DATE_PATTERN = re.compile(
+        r'(\w+),\s+(\w+)\s+(\d{1,2})(?:st|nd|rd|th)?,\s+(\d{4})\s+\((\d+)\s+XP\)'
+    )
+    # XP cell patterns
+    _XP_REGULAR = re.compile(r'(\d+)/(\d+)\s+XP')
+    _XP_PLACEMENT = re.compile(r'(\d+)/\s+XP')
+
+    def parse_course_data(self) -> List[Dict[str, Any]]:
+        """Parse course progress data from PDF.
+
+        Uses pdfplumber's table extraction (based on PDF ruling/lines) which
+        correctly preserves record boundaries even when a record's long
+        description wraps across rows and visually interleaves with the next
+        record in the text stream. Falls back to the legacy text-stream parser
+        for any page where no tables are found.
+
+        Date association is global: a table row is assigned to the nearest date
+        header line at or above it across the whole document, so records at the
+        top of a page whose date header sits on the previous page are still
+        labeled correctly.
+        """
+        course_data: List[Dict[str, Any]] = []
+
+        with pdfplumber.open(self.pdf_parser.pdf_path) as pdf:
+            pages = pdf.pages
+
+            # Pass 1: collect every date header across the document, keyed by a
+            # synthetic document-linear y so cross-page proximity works.
+            global_dates: List[Tuple[float, str, Optional[int]]] = []
+            for page_idx, page in enumerate(pages):
+                for y, date_str, total in self._page_date_axes(page):
+                    global_dates.append((page_idx * 10000 + y, date_str, total))
+            global_dates.sort(key=lambda r: r[0])
+
+            # Pass 2: walk pages in order, extracting table rows and associating
+            # each with its date via the global date axis.
+            for page_idx, page in enumerate(pages):
+                found_tables = page.find_tables()
+                if not found_tables:
+                    course_data.extend(self._parse_page_via_text(page))
+                    continue
+
+                extracted = page.extract_tables()
+                for table_obj, table_cells in zip(found_tables, extracted):
+                    rows = list(table_obj.rows)
+                    for idx, row_cells in enumerate(table_cells):
+                        row_y = rows[idx].bbox[1] if idx < len(rows) else table_obj.bbox[1]
+                        doc_y = page_idx * 10000 + row_y
+                        cells = [(c or '').strip() for c in row_cells]
+                        if len(cells) < 4:
+                            continue
+                        course, task, desc, xp = cells[0], cells[1], cells[2], cells[3]
+                        # Skip header rows
+                        if course.upper() == 'COURSE' and task.upper() == 'TASK':
+                            continue
+                        if task not in self._TASK_TYPES:
+                            continue
+
+                        parsed_xp = self._parse_xp_cell(xp)
+                        if parsed_xp is None:
+                            continue
+
+                        earned, possible, detail = parsed_xp
+                        # Normalize multi-line descriptions into a single line.
+                        description = ' '.join(desc.split())
+
+                        date_str, daily_total = self._date_for_y(doc_y, global_dates)
+                        if date_str is None:
+                            continue
+
+                        course_data.append({
+                            'Date': date_str,
+                            'Course': course,
+                            'Task': task,
+                            'Description': description if description else 'Placement Test',
+                            'XP Earned': earned,
+                            'XP Possible': possible,
+                            'XP Detail': detail,
+                            'Daily Total XP': daily_total,
+                        })
+
+        return course_data
+
+    def _parse_xp_cell(self, xp: str) -> Optional[Tuple[int, int, str]]:
+        """Parse an XP cell like '6/4 XP' or '35/ XP' (placement).
+
+        Returns (earned, possible, detail) or None if it doesn't match.
+        """
+        m = self._XP_REGULAR.search(xp)
+        if m:
+            earned, possible = int(m.group(1)), int(m.group(2))
+            return earned, possible, f"{earned}/{possible}"
+        m = self._XP_PLACEMENT.search(xp)
+        if m:
+            earned = int(m.group(1))
+            return earned, earned, f"{earned}/"
+        return None
+
+    def _page_date_axes(self, page) -> List[Tuple[float, str, Optional[int]]]:
+        """Return list of (y, date_str, daily_total) for each date line on the page.
+
+        Sorted by y ascending. Used to associate table rows with their date by
+        picking the nearest date line at or above the row's y coordinate.
+        """
+        words = page.extract_words()
+        # Group words into visual lines by y (top), with small tolerance.
+        lines: Dict[int, List[Tuple[float, str]]] = {}
+        for w in words:
+            y = round(w['top'])
+            # snap to nearest bucket within tolerance
+            key = min(lines.keys(), key=lambda k: abs(k - y)) if lines else None
+            if key is not None and abs(key - y) <= 3:
+                lines[key].append((w['x0'], w['text']))
+            else:
+                lines[y] = [(w['x0'], w['text'])]
+
+        result = []
+        for y, tokens in lines.items():
+            tokens.sort()
+            text = ' '.join(t for _, t in tokens)
+            m = self._DATE_PATTERN.search(text)
+            if m:
+                _, month, day, year, total_xp = m.groups()
+                date_str = f"{year}-{self._month_to_num(month)}-{int(day):02d}"
+                result.append((y, date_str, int(total_xp)))
+        result.sort(key=lambda r: r[0])
+        return result
+
+    def _date_for_y(
+        self, row_y: float,
+        date_axes: List[Tuple[float, str, Optional[int]]],
+    ) -> Tuple[Optional[str], Optional[int]]:
+        """Return the date line nearest to (and at or above) the row's y.
+
+        ``date_axes`` is sorted ascending by y. The chosen date is the latest
+        date line with y <= row_y; if the row sits above every date line, the
+        first date line is used (the date header normally precedes its records,
+        and a row above the first date belongs to the previous page's tail).
+        """
+        if not date_axes:
+            return None, None
+
+        chosen: Optional[Tuple[str, Optional[int]]] = None
+        for y, date_str, total in date_axes:
+            if y <= row_y + 3:
+                chosen = (date_str, total)
+            else:
+                break
+        if chosen is None:
+            _, date_str, total = date_axes[0]
+            chosen = (date_str, total)
+        return chosen
+
+    # ------------------------------------------------------------------ #
+    # Legacy text-stream parser, used as a per-page fallback when a page
+    # yields no extractable tables.
+    # ------------------------------------------------------------------ #
+    def _parse_page_via_text(self, page) -> List[Dict[str, Any]]:
+        """Parse a single page using the legacy text-stream approach."""
+        text_content = page.extract_text() or ''
+        return self._parse_text_block(text_content)
+
+    def _parse_text_block(self, text_content: str) -> List[Dict[str, Any]]:
+        """Legacy text-stream parser (kept for fallback compatibility)."""
         lines = text_content.split('\n')
 
         course_data = []
@@ -149,7 +313,7 @@ class CourseProgressParser:
                     'Description': 'Placement Test',
                     'XP Earned': xp_earned,
                     'XP Possible': xp_possible,
-                    'XP Detail': f"{xp_earned}/",
+                    'XP Detail': f"{earned}/",
                     'Daily Total XP': daily_total
                 })
                 prefix_lines = []
