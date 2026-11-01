@@ -24,11 +24,11 @@ class CourseProgressParser:
 
     # Date line pattern, e.g. "Wed, Jul 8th, 2026 (71 XP)"
     _DATE_PATTERN = re.compile(
-        r'(\w+),\s+(\w+)\s+(\d{1,2})(?:st|nd|rd|th)?,\s+(\d{4})\s+\((\d+)\s+XP\)'
+        r'(\w+),\s+(\w+)\s+(\d{1,2})(?:st|nd|rd|th)?,\s+(\d{4})\s+\((-?\d+)\s+XP\)'
     )
     # XP cell patterns
-    _XP_REGULAR = re.compile(r'(\d+)/(\d+)\s+XP')
-    _XP_PLACEMENT = re.compile(r'(\d+)/\s+XP')
+    _XP_REGULAR = re.compile(r'(-?\d+)/(\d+)\s+XP')
+    _XP_PLACEMENT = re.compile(r'(-?\d+)/\s+XP')
 
     def parse_course_data(self) -> List[Dict[str, Any]]:
         """Parse course progress data from PDF.
@@ -107,7 +107,7 @@ class CourseProgressParser:
         return course_data
 
     def _parse_xp_cell(self, xp: str) -> Optional[Tuple[int, int, str]]:
-        """Parse an XP cell like '6/4 XP' or '35/ XP' (placement).
+        """Parse signed XP cells, e.g. '-4/4 XP', '6/4 XP', or '35/ XP'.
 
         Returns (earned, possible, detail) or None if it doesn't match.
         """
@@ -195,12 +195,12 @@ class CourseProgressParser:
         prefix_lines = []  # Store lines that come before the main data line
 
         # Improved regex patterns
-        date_pattern = r'(\w+),\s+(\w+)\s+(\d{1,2})(?:st|nd|rd|th)?,\s+(\d{4})\s+\((\d+)\s+XP\)'
+        date_pattern = self._DATE_PATTERN
         # Regular task pattern (e.g., "4th Grade Math Quiz Quiz 1 18/15 XP")
         # The description part is optional - can be "18/18 XP" or "Some Description 18/18 XP"
         regular_task_pattern = r'^(.+?)\s+(Quiz|Lesson|Review|Multistep)\s+(.+)$'
         # Placement task pattern (e.g., "4th Grade Math Placement 35/ XP")
-        placement_task_pattern = r'^(.+?)\s+(Placement)\s+(\d+)/\s+XP$'
+        placement_task_pattern = r'^(.+?)\s+(Placement)\s+(-?\d+)/\s+XP$'
 
         i = 0
         while i < len(lines):
@@ -243,7 +243,7 @@ class CourseProgressParser:
 
                     # Extract XP from the end
                     # Pattern might be "18/18 XP" or "Some Description 18/18 XP"
-                    xp_pattern = r'^(.*?)?(\d+)/(\d+)\s+XP$'
+                    xp_pattern = r'^(.*?)(-?\d+)/(\d+)\s+XP$'
                     xp_match = re.search(xp_pattern, desc_with_xp)
                     if xp_match:
                         description = (xp_match.group(1) or '').strip()
@@ -267,8 +267,8 @@ class CourseProgressParser:
                             if (not next_line or
                                 re.search(date_pattern, next_line) or
                                 next_line == 'COURSE TASK DESCRIPTION XP EARNED' or
-                                re.search(r'\d+/\d+\s+XP', next_line) or
-                                re.search(r'\d+/\s+XP', next_line)):
+                                self._XP_REGULAR.search(next_line) or
+                                self._XP_PLACEMENT.search(next_line)):
                                 break
                             # Check if it looks like text content
                             if re.search(r'[a-zA-Z]{3,}', next_line):
@@ -323,7 +323,7 @@ class CourseProgressParser:
             # If line doesn't match any pattern and isn't a header/date,
             # it might be a continuation line (part of description)
             # Check if it looks like text content (has letters but no XP pattern)
-            if line and not re.search(r'\d+/\d+\s+XP', line) and not re.search(r'\d+/\s+XP', line):
+            if line and not self._XP_REGULAR.search(line) and not self._XP_PLACEMENT.search(line):
                 # Check if it looks like a text line (has letters)
                 if re.search(r'[a-zA-Z]{3,}', line):
                     prefix_lines.append(line)
